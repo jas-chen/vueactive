@@ -1,7 +1,7 @@
 {
   "name": "reactive-components",
   "version": "0.1.0",
-  "description": "",
+  "description": "Reactive React components, powered by @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
   "repository": {
