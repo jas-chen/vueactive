@@ -1,12 +1,12 @@
 import React from 'react';
 import { ref, unref } from '@vue/reactivity';
-import { Rc, useMemoOnce } from '../react-reactivity';
+import { Reactive, useMemoOnce } from '../react-reactivity';
 
 const Text$ = (props) => {
   return useMemoOnce(() => {
     return (
       <h4>
-        <Rc>{() => unref(props.text)}</Rc>
+        <Reactive>{() => unref(props.text)}</Reactive>
       </h4>
     )
   });
@@ -17,14 +17,14 @@ const InputApp = () =>
     const text$ = ref('');
     return (
       <>
-        <Rc>{
+        <Reactive>{
           () => (
             <input
               value={text$.value}
               onChange={(e) => { text$.value = e.target.value }}
             />
           )
-        }</Rc>
+        }</Reactive>
         <Text$ text={text$} />
       </>
     )

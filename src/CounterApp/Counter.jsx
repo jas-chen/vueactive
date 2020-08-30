@@ -1,6 +1,6 @@
 import React from 'react';
 import { ref, computed, unref } from '@vue/reactivity';
-import { useMemoOnce, Rc } from '../react-reactivity';
+import { useMemoOnce, reactive as r } from '../react-reactivity';
 
 const Counter$ = ({ name }) =>
   useMemoOnce(() => {
@@ -8,20 +8,22 @@ const Counter$ = ({ name }) =>
 
     return (
       <div>
-        <Rc unref={name} />
+        {r(name)}
         {' '}counter:{' '}
-        <Rc unref={count$} />
+        {r(count$)}
         <button onClick={() => count$.value++}>+</button>
         <div>
-          <Rc>
-            {
-              () => unref(name) === 'outer' &&
-              (() => {
-                const innerName$ = computed(() => `[outer counter: ${count$.value}] inner`);
-                return <Counter$ name={innerName$} />
-              })()
-            }
-          </Rc>
+          {
+            r(() => {
+              return unref(name) === 'outer' &&
+                (() => {
+                  const innerName$ = computed(
+                    () => `[outer counter: ${count$.value}] inner`
+                  );
+                  return <Counter$ name={innerName$} />
+                })();
+            })
+          }
         </div>
       </div>
     );
