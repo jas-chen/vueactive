@@ -1,6 +1,6 @@
 import React from 'react';
 import { ref, unref } from '@vue/reactivity';
-import { Reactive, useMemoOnce } from '../react-reactivity';
+import { Reactive, useMemoOnce } from '../reactive-components';
 
 const Text$ = (props) => {
   return useMemoOnce(() => {

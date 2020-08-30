@@ -1,6 +1,6 @@
 import React from 'react';
 import { ref, computed, unref } from '@vue/reactivity';
-import { useMemoOnce, reactive as r } from '../react-reactivity';
+import { useMemoOnce, reactive as r } from '../reactive-components';
 
 const Counter$ = ({ name }) =>
   useMemoOnce(() => {
