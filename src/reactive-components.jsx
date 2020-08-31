@@ -6,11 +6,27 @@ export const Reactive = ({ children: render }) => {
   const effectRef = useRef();
   useEffect(() => {
     effectRef.current = effect(() => {
-      const nextElement = render();
-      if (effectRef.current) {
-        setElement(nextElement);
+      if (!effectRef.current) {
+        render()
+      } else {
+        setElement(render());
       }
-    })
+    },{
+      scheduler: (() => {
+        let callback;
+        let isFlushing = false;
+        return (job) => {
+          callback = job;
+          if (!isFlushing) {
+            isFlushing = true;
+            requestAnimationFrame(() => {
+              callback();
+              isFlushing = false;
+            });
+          }
+        }
+      })()
+    });
 
     return () => {
       stop(effectRef.current);
