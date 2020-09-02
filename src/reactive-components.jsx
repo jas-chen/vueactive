@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { effect, stop, unref } from '@vue/reactivity';
 
-const scheduler = (() => {
+const defaultScheduler = (() => {
   let jobs = new Set();
   let isFlushing = false;
   const executeJobs = () => {
@@ -22,31 +22,71 @@ const scheduler = (() => {
   }
 })();
 
-const R = ({ children, ...props }) => {
+const Reactive = ({
+  children,
+  scheduler = defaultScheduler,
+  lazy,
+  onTrack,
+  onTrigger,
+  onStop,
+}) => {
+  const effectOptions = useMemo(
+    () => ({
+      scheduler,
+      lazy,
+      onTrack,
+      onTrigger,
+      onStop,
+    }),
+    [
+      scheduler,
+      lazy,
+      onTrack,
+      onTrigger,
+      onStop,
+    ]
+  );
+
+  const effectRef = useRef();
   const render = useMemo(() => {
     return typeof children === 'function'
       ? children
       : () => unref(children);
   }, [children]);
-  const [element, setElement] = useState(render);
-  const effectRef = useRef();
-  useEffect(() => {
-    const update = () => {
-      if (!effectRef.current) {
-        render()
-      } else {
-        setElement(render());
-      }
-    }
 
-    effectRef.current = effect(update, { scheduler, ...props });
+  const [element, setElement] = useState(() => {
+    let _element;
+    effectRef.current = effect(
+      () => {
+        if (!effectRef.current) {
+          _element = render();
+        } else {
+          setElement(render());
+        }
+      },
+      effectOptions
+    );
+
+    return _element;
+  });
+  
+  useEffect(() => {
+    if (!effectRef.current) {
+      effectRef.current = effect(
+        () => {
+          setElement(render());
+        },
+        effectOptions
+      );
+    }
 
     return () => {
       stop(effectRef.current);
       effectRef.current = undefined;
     }
-  }, [render]);
+  }, [render, effectOptions]);
+
   return element;
 }
 
-export default R;
+export default Reactive;
