@@ -155,70 +155,71 @@ const App = () => {
       )}</R>
     );
 
-    const renderTodoList = () => (
-      <R>{() =>
-        filteredTodoList$.value.map((todo) => {
-          const destroyBtn = (
-            <button
-              className="destroy"
-              onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
-            />
-          );
-          return (
-            <R key={todo.id}>{
-              () => (
-                <li
-                  className={
-                    [
-                      todo.done ? 'completed' : '',
-                      editingTodo$.value === todo ? 'editing ' : '',
-                    ].join('')
-                  }
+    const renderTodoItem = (todo) => {
+      const destroyBtn = (
+        <button
+          className="destroy"
+          onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
+        />
+      );
+      return (
+        <R key={todo.id}>{
+          () => (
+            <li
+              className={
+                [
+                  todo.done ? 'completed' : '',
+                  editingTodo$.value === todo ? 'editing ' : '',
+                ].join('')
+              }
+            >
+              <div className="view">
+                <input
+                  type="checkbox"
+                  className="toggle"
+                  checked={todo.done}
+                  onChange={() => {
+                    todo.done = !todo.done
+                  }}
+                />
+                <label
+                  onDoubleClick={() => {
+                    editingTodo$.value = todo;
+                  }}
                 >
-                  <div className="view">
-                    <input
-                      type="checkbox"
-                      className="toggle"
-                      checked={todo.done}
-                      onChange={() => {
-                        todo.done = !todo.done
-                      }}
-                    />
-                    <label
-                      onDoubleClick={() => {
-                        editingTodo$.value = todo;
-                      }}
-                    >
-                      {todo.label}
-                    </label>
-                    {destroyBtn}
-                  </div>
-                  {
-                    editingTodo$.value === todo
-                    && (
-                      <input
-                        className="edit"
-                        value={editingTodo$.value.label}
-                        ref={(input) => input && input.focus()}
-                        onChange={(e) => {
-                          editingTodo$.value.label = e.target.value;
-                        }}
-                        onBlur={() => {
-                          editingTodo$.value = null;
-                        }}
-                        onKeyDown={({key}) => {
-                          if (['Enter', 'Escape'].includes(key)) {
-                            editingTodo$.value = null;
-                          }
-                        }}
-                      />
-                    )
-                  }
-                </li>
-              )
-            }</R>
-          )})
-      }</R>
+                  {todo.label}
+                </label>
+                {destroyBtn}
+              </div>
+              {
+                editingTodo$.value === todo
+                && (
+                  <input
+                    className="edit"
+                    value={editingTodo$.value.label}
+                    ref={(input) => input && input.focus()}
+                    onChange={(e) => {
+                      editingTodo$.value.label = e.target.value;
+                    }}
+                    onBlur={() => {
+                      editingTodo$.value = null;
+                    }}
+                    onKeyDown={({key}) => {
+                      if (['Enter', 'Escape'].includes(key)) {
+                        editingTodo$.value = null;
+                      }
+                    }}
+                  />
+                )
+              }
+            </li>
+          )
+        }</R>
+      );
+    }
+
+    const renderTodoList = () => (
+      <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
     );
 
     const renderItemsLeft = () => (
