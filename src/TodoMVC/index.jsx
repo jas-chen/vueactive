@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { ref, reactive, computed } from '@vue/reactivity';
 import R, { Effect } from '../reactive-components';
 
@@ -202,13 +202,10 @@ const App = () => {
               className="clear-completed"
               onClick={() => {
                 const notCompletedTodoList = todoList$.filter(({ done }) => !done);
-                if (todoList$.length - notCompletedTodoList.length > 0) {
-                  todoList$.splice(
-                    0,
-                    todoList$.length,
-                    ...notCompletedTodoList,
-                  );
-                }
+                todoList$.length = todoList$.length - notCompletedTodoList.length;
+                notCompletedTodoList.forEach((todo, i) => {
+                  todoList$[i] = todo;
+                });
               }}
             >
               Clear completed
