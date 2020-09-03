@@ -7,9 +7,9 @@ document.head.insertAdjacentHTML(
   '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
 );
 
-const validHash = () => ['#/', '#/active', '#/completed'].includes(location.hash);
+const isUrlValid = () => ['#/', '#/active', '#/completed'].includes(location.hash);
 
-if (!validHash()) {
+if (!isUrlValid()) {
   location.hash = '#/';
 }
 
@@ -68,7 +68,7 @@ const App = () => {
       <>
         <Effect>{() => {
           const setTodoFilter = () => {
-            if (!validHash()) {
+            if (!isUrlValid()) {
               location.hash = '#/';
             } else {
               todoFilter$.value = hashFilterMap[location.hash];
