@@ -30,7 +30,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
       onTrigger,
       onStop,
     }),
-    [scheduler, onTrack, onTrigger, onStop],
+    [onTrack, onTrigger, onStop],
   );
 
   const effectRef = useRef();
