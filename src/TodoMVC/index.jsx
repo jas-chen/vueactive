@@ -7,17 +7,25 @@ document.head.insertAdjacentHTML(
   '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
 );
 
-const isUrlValid = () => ['#/', '#/active', '#/completed'].includes(location.hash);
-
-if (!isUrlValid()) {
-  location.hash = '#/';
-}
-
-const hashFilterMap = {
+const hashFilterKeyMap = {
   '#/': 'ALL',
   '#/active': 'ACTIVE',
   '#/completed': 'COMPLETED',
 };
+
+const filterKeyLabelMap = {
+  'ALL': 'All',
+  'ACTIVE': 'Active',
+  'COMPLETED': 'Completed',
+};
+
+const hashes = Object.keys(hashFilterKeyMap);
+
+const isUrlValid = () => hashes.includes(location.hash);
+
+if (!isUrlValid()) {
+  location.hash = '#/';
+}
 
 const Layout = ({
   renderNewTodo,
@@ -73,7 +81,7 @@ const Layout = ({
 
 const App = () => {
   return useMemo(() => {
-    const todoFilter$ = ref(hashFilterMap[location.hash]);
+    const todoFilter$ = ref(hashFilterKeyMap[location.hash]);
     const newTodo = label => ({
       id: (new Date()).getTime(),
       label: (label || '').trim(),
@@ -150,7 +158,6 @@ const App = () => {
     const renderTodoList = () => (
       <R>{() =>
         filteredTodoList$.value.map((todo) => {
-          console.log(todo);
           const destroyBtn = (
             <button
               className="destroy"
@@ -177,9 +184,13 @@ const App = () => {
                         todo.done = !todo.done
                       }}
                     />
-                    <label onDoubleClick={() => {
-                      editingTodo$.value = todo;
-                    }}>{todo.label}</label>
+                    <label
+                      onDoubleClick={() => {
+                        editingTodo$.value = todo;
+                      }}
+                    >
+                      {todo.label}
+                    </label>
                     {destroyBtn}
                   </div>
                   {
@@ -188,6 +199,7 @@ const App = () => {
                       <input
                         className="edit"
                         value={editingTodo$.value.label}
+                        ref={(input) => input && input.focus()}
                         onChange={(e) => {
                           editingTodo$.value.label = e.target.value;
                         }}
@@ -213,25 +225,20 @@ const App = () => {
       <R>{itemsLeft$}</R>
     );
 
-    const renderFilters = () => (
-      <>
-        <li>
-          <R>{() => (
-            <a href="#/" className={todoFilter$.value === 'ALL' ? 'selected' : ''}>All</a>
-          )}</R>
-        </li>
-        <li>
-          <R>{() => (
-            <a href="#/active" className={todoFilter$.value === 'ACTIVE' ? 'selected' : ''}>Active</a>
-          )}</R>
-        </li>
-        <li>
-          <R>{() => (
-            <a href="#/completed" className={todoFilter$.value === 'COMPLETED' ? 'selected' : ''}>Completed</a>
-          )}</R>
-        </li>
-      </>
-    );
+    const renderFilters = () => ['ALL', 'ACTIVE', 'COMPLETED'].map((filterKey) => (
+      <li key={filterKey}>
+        <R>{() => (
+          <a
+            href={
+              hashes.find((hash) => hashFilterKeyMap[hash] === filterKey)
+            }
+            className={todoFilter$.value === filterKey ? 'selected' : ''}
+          >{
+            filterKeyLabelMap[filterKey]
+          }</a>
+        )}</R>
+      </li>
+    ));
 
     const onClearCompletedClick = () => {
       const notCompletedTodoList = todoList$.filter(({ done }) => !done);
@@ -248,7 +255,7 @@ const App = () => {
             if (!isUrlValid()) {
               location.hash = '#/';
             } else {
-              todoFilter$.value = hashFilterMap[location.hash];
+              todoFilter$.value = hashFilterKeyMap[location.hash];
             }
           }
 
