@@ -8,18 +8,23 @@
     "type": "git",
     "url": "git+https://github.com/jas-chen/reactive-components.git"
   },
+  "source": "src/index.js",
+  "main": "dist/reactive-components.js",
+  "module": "dist/reactive-components.module.js",
+  "umd:main": "dist/reactive-components.umd.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build"
+    "build": "rm -rf dist && microbundle"
   },
-  "dependencies": {
-    "@pika/react": "^16.13.1",
-    "@pika/react-dom": "^16.13.1",
-    "@vue/reactivity": "^3.0.0-rc.9"
+  "peerDependencies": {
+    "@vue/reactivity": "^3.0.0-rc.9",
+    "react": ">=16.8",
+    "react-dom": ">=16.8"
   },
   "devDependencies": {
-    "vite": "^1.0.0-rc.1",
-    "vite-plugin-react": "^3.0.0"
+    "@vue/reactivity": "3.0.0-rc.9",
+    "microbundle": "^0.12.3",
+    "react": "16.13.1",
+    "react-dom": "16.13.1"
   },
   "bugs": {
     "url": "https://github.com/jas-chen/reactive-components/issues"
