@@ -13,7 +13,8 @@
   "module": "dist/reactive-components.module.js",
   "umd:main": "dist/reactive-components.umd.js",
   "scripts": {
-    "build": "rm -rf dist && microbundle"
+    "build": "rm -rf dist && microbundle",
+    "prepublishOnly": "yarn build"
   },
   "peerDependencies": {
     "@vue/reactivity": "^3.0.0-rc.9",
