@@ -1,9 +1,13 @@
 # reactive-components
 > Reactive React components, powered by @vue/reactivity.
 
+## Installation
+
 ```
 yarn add @jas-chen/reactive-components
 ```
+
+## Usage
 
 Clock example
 
