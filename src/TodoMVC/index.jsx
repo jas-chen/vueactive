@@ -1,22 +1,22 @@
-import React, { useMemo } from 'react';
-import { ref, reactive, computed } from '@vue/reactivity';
-import R, { Effect } from '../reactive-components';
+import React, { useMemo } from "react";
+import { ref, reactive, computed } from "@vue/reactivity";
+import R, { Effect } from "../reactive-components";
 
 document.head.insertAdjacentHTML(
-  'beforeend',
-  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
+  "beforeend",
+  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">',
 );
 
 const hashFilterKeyMap = {
-  '#/': 'ALL',
-  '#/active': 'ACTIVE',
-  '#/completed': 'COMPLETED',
+  "#/": "ALL",
+  "#/active": "ACTIVE",
+  "#/completed": "COMPLETED",
 };
 
 const filterKeyLabelMap = {
-  'ALL': 'All',
-  'ACTIVE': 'Active',
-  'COMPLETED': 'Completed',
+  ALL: "All",
+  ACTIVE: "Active",
+  COMPLETED: "Completed",
 };
 
 const hashes = Object.keys(hashFilterKeyMap);
@@ -24,7 +24,7 @@ const hashes = Object.keys(hashFilterKeyMap);
 const isUrlValid = () => hashes.includes(location.hash);
 
 if (!isUrlValid()) {
-  location.hash = '#/';
+  location.hash = "#/";
 }
 
 const Layout = ({
@@ -45,24 +45,15 @@ const Layout = ({
       <section className="main">
         {renderToggleAll()}
         <label htmlFor="toggle-all" />
-        <ul className="todo-list">
-          {renderTodoList()}
-        </ul>
+        <ul className="todo-list">{renderTodoList()}</ul>
       </section>
 
       <footer className="footer">
         <span className="todo-count">
-          <strong>
-          {renderItemsLeft()}
-          </strong> items left
+          <strong>{renderItemsLeft()}</strong> items left
         </span>
-        <ul className="filters">
-          {renderFilters()}
-        </ul>
-        <button
-          className="clear-completed"
-          onClick={onClearCompletedClick}
-        >
+        <ul className="filters">{renderFilters()}</ul>
+        <button className="clear-completed" onClick={onClearCompletedClick}>
           Clear completed
         </button>
       </footer>
@@ -82,51 +73,49 @@ const Layout = ({
 const App = () => {
   return useMemo(() => {
     const todoFilter$ = ref(hashFilterKeyMap[location.hash]);
-    const newTodo = label => ({
-      id: (new Date()).getTime(),
-      label: (label || '').trim(),
+    const newTodo = (label) => ({
+      id: new Date().getTime(),
+      label: (label || "").trim(),
       done: false,
     });
     const todoList$ = reactive([]);
     const filteredTodoList$ = computed(() => {
-      if (todoFilter$.value === 'ALL') {
+      if (todoFilter$.value === "ALL") {
         return todoList$;
       }
 
-      const filterValue = todoFilter$.value === 'COMPLETED';
+      const filterValue = todoFilter$.value === "COMPLETED";
       return todoList$.filter(({ done }) => done === filterValue);
-    })
-    const itemsLeft$ = computed(() => todoList$.reduce(
-      (sum, todo) => sum += !todo.done ? 1 : 0,
-      0,
-    ));
-    const isAllCompleted$ = computed(() =>
-      todoList$.length 
-      && todoList$.reduce(
-        (sum, todo) => sum + (todo.done ? 1 : 0),
-        0
-      ) === todoList$.length
+    });
+    const itemsLeft$ = computed(() =>
+      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0),
+    );
+    const isAllCompleted$ = computed(
+      () =>
+        todoList$.length &&
+        todoList$.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
+          todoList$.length,
     );
 
-    const newTodo$ = ref('');
+    const newTodo$ = ref("");
     const editingTodo$ = ref(null);
 
     const onNewTodoChange = (e) => {
       newTodo$.value = e.target.value;
-    }
+    };
     const onAddTodo = (e) => {
       if (e.key === "Enter") {
         const { value } = newTodo$;
         if (value) {
           todoList$.unshift(newTodo(value));
-          newTodo$.value = '';
+          newTodo$.value = "";
         }
       }
-    }
+    };
 
     const renderNewTodo = () => (
-      <R>{
-        () => (
+      <R>
+        {() => (
           <input
             className="new-todo"
             placeholder="What needs to be done?"
@@ -134,25 +123,27 @@ const App = () => {
             onChange={onNewTodoChange}
             onKeyPress={onAddTodo}
           />
-        )
-      }</R>
+        )}
+      </R>
     );
 
     const renderToggleAll = () => (
-      <R>{() => (
-        <input
-          id="toggle-all"
-          type="checkbox"
-          className="toggle-all"
-          checked={isAllCompleted$.value}
-          onChange={() => {
-            const setTo = isAllCompleted$.value ? false : true;
-            todoList$.forEach((todo) => {
-              todo.done = setTo;
-            });
-          }}
-        />
-      )}</R>
+      <R>
+        {() => (
+          <input
+            id="toggle-all"
+            type="checkbox"
+            className="toggle-all"
+            checked={isAllCompleted$.value}
+            onChange={() => {
+              const setTo = isAllCompleted$.value ? false : true;
+              todoList$.forEach((todo) => {
+                todo.done = setTo;
+              });
+            }}
+          />
+        )}
+      </R>
     );
 
     const renderTodoItem = (todo) => {
@@ -163,15 +154,13 @@ const App = () => {
         />
       );
       return (
-        <R key={todo.id}>{
-          () => (
+        <R key={todo.id}>
+          {() => (
             <li
-              className={
-                [
-                  todo.done ? 'completed' : '',
-                  editingTodo$.value === todo ? 'editing ' : '',
-                ].join('')
-              }
+              className={[
+                todo.done ? "completed" : "",
+                editingTodo$.value === todo ? "editing " : "",
+              ].join("")}
             >
               <div className="view">
                 <input
@@ -179,7 +168,7 @@ const App = () => {
                   className="toggle"
                   checked={todo.done}
                   onChange={() => {
-                    todo.done = !todo.done
+                    todo.done = !todo.done;
                   }}
                 />
                 <label
@@ -191,55 +180,53 @@ const App = () => {
                 </label>
                 {destroyBtn}
               </div>
-              {
-                editingTodo$.value === todo
-                && (
-                  <input
-                    className="edit"
-                    value={editingTodo$.value.label}
-                    ref={(input) => input && input.focus()}
-                    onChange={(e) => {
-                      editingTodo$.value.label = e.target.value;
-                    }}
-                    onBlur={() => {
+              {editingTodo$.value === todo && (
+                <input
+                  className="edit"
+                  value={editingTodo$.value.label}
+                  ref={(input) => input && input.focus()}
+                  onChange={(e) => {
+                    editingTodo$.value.label = e.target.value;
+                  }}
+                  onBlur={() => {
+                    editingTodo$.value = null;
+                  }}
+                  onKeyDown={({ key }) => {
+                    if (["Enter", "Escape"].includes(key)) {
                       editingTodo$.value = null;
-                    }}
-                    onKeyDown={({key}) => {
-                      if (['Enter', 'Escape'].includes(key)) {
-                        editingTodo$.value = null;
-                      }
-                    }}
-                  />
-                )
-              }
+                    }
+                  }}
+                />
+              )}
             </li>
-          )
-        }</R>
+          )}
+        </R>
       );
-    }
+    };
 
     const renderTodoList = () => (
       <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
     );
 
-    const renderItemsLeft = () => (
-      <R>{itemsLeft$}</R>
-    );
+    const renderItemsLeft = () => <R>{itemsLeft$}</R>;
 
-    const renderFilters = () => ['ALL', 'ACTIVE', 'COMPLETED'].map((filterKey) => (
-      <li key={filterKey}>
-        <R>{() => (
-          <a
-            href={
-              hashes.find((hash) => hashFilterKeyMap[hash] === filterKey)
-            }
-            className={todoFilter$.value === filterKey ? 'selected' : ''}
-          >{
-            filterKeyLabelMap[filterKey]
-          }</a>
-        )}</R>
-      </li>
-    ));
+    const renderFilters = () =>
+      ["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
+        <li key={filterKey}>
+          <R>
+            {() => (
+              <a
+                href={hashes.find(
+                  (hash) => hashFilterKeyMap[hash] === filterKey,
+                )}
+                className={todoFilter$.value === filterKey ? "selected" : ""}
+              >
+                {filterKeyLabelMap[filterKey]}
+              </a>
+            )}
+          </R>
+        </li>
+      ));
 
     const onClearCompletedClick = () => {
       const notCompletedTodoList = todoList$.filter(({ done }) => !done);
@@ -247,31 +234,36 @@ const App = () => {
       notCompletedTodoList.forEach((todo, i) => {
         todoList$[i] = todo;
       });
-    }
+    };
 
     return (
       <>
-        <Effect>{() => {
-          const setTodoFilter = () => {
-            if (!isUrlValid()) {
-              location.hash = '#/';
-            } else {
-              todoFilter$.value = hashFilterKeyMap[location.hash];
-            }
-          }
+        <Effect>
+          {() => {
+            const setTodoFilter = () => {
+              if (!isUrlValid()) {
+                location.hash = "#/";
+              } else {
+                todoFilter$.value = hashFilterKeyMap[location.hash];
+              }
+            };
 
-          window.addEventListener('hashchange', setTodoFilter);
+            window.addEventListener("hashchange", setTodoFilter);
 
-          return () => window.removeEventListener('hashchange', setTodoFilter);
-        }}</Effect>
-        <Layout {...({
-          renderNewTodo,
-          renderToggleAll,
-          renderTodoList,
-          renderItemsLeft,
-          renderFilters,
-          onClearCompletedClick,
-        })} />
+            return () =>
+              window.removeEventListener("hashchange", setTodoFilter);
+          }}
+        </Effect>
+        <Layout
+          {...{
+            renderNewTodo,
+            renderToggleAll,
+            renderTodoList,
+            renderItemsLeft,
+            renderFilters,
+            onClearCompletedClick,
+          }}
+        />
       </>
     );
   });
