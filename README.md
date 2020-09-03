@@ -1,5 +1,5 @@
 # reactive-components
-> Reactive React components, powered by @vue/reactivity.
+> Reactive React components, powered by [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
 
 ## Installation
 
@@ -40,3 +40,5 @@ const App = () => {
 
 export default App;
 ```
+
+[TodoMVC](./examples/TodoMVC)
