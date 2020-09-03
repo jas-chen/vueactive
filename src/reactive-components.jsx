@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { effect, stop, unref } from '@vue/reactivity';
 
-const defaultScheduler = (() => {
+const scheduler = (() => {
   let jobs = new Set();
   let isFlushing = false;
   const executeJobs = () => {
@@ -24,8 +24,6 @@ const defaultScheduler = (() => {
 
 const Reactive = ({
   children,
-  scheduler = defaultScheduler,
-  lazy,
   onTrack,
   onTrigger,
   onStop,
@@ -33,14 +31,12 @@ const Reactive = ({
   const effectOptions = useMemo(
     () => ({
       scheduler,
-      lazy,
       onTrack,
       onTrigger,
       onStop,
     }),
     [
       scheduler,
-      lazy,
       onTrack,
       onTrigger,
       onStop,
@@ -87,6 +83,11 @@ const Reactive = ({
   }, [render, effectOptions]);
 
   return element;
+}
+
+export const Effect = ({ children }) => {
+  useEffect(children, [children]);
+  return null;
 }
 
 export default Reactive;

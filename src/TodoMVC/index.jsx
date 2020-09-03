@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import { ref, reactive, computed } from '@vue/reactivity';
-import R from '../reactive-components';
+import R, { Effect } from '../reactive-components';
 
 document.head.insertAdjacentHTML(
   'beforeend',
@@ -20,23 +20,8 @@ const hashFilterMap = {
 };
 
 const App = () => {
-  const todoFilter$ = useMemo(() => ref(hashFilterMap[location.hash]));
-
-  useEffect(() => {
-    const setTodoFilter = () => {
-      if (!validHash()) {
-        location.hash = '#/';
-      } else {
-        todoFilter$.value = hashFilterMap[location.hash];
-      }
-    }
-
-    window.addEventListener('hashchange', setTodoFilter);
-
-    return () => window.removeEventListener('hashchange', setTodoFilter);
-  }, [todoFilter$]);
-
   return useMemo(() => {
+    const todoFilter$ = ref(hashFilterMap[location.hash]);
     const newTodo = label => ({
       id: (new Date()).getTime(),
       label: (label || '').trim(),
@@ -81,6 +66,19 @@ const App = () => {
 
     return (
       <>
+        <Effect>{() => {
+          const setTodoFilter = () => {
+            if (!validHash()) {
+              location.hash = '#/';
+            } else {
+              todoFilter$.value = hashFilterMap[location.hash];
+            }
+          }
+
+          window.addEventListener('hashchange', setTodoFilter);
+
+          return () => window.removeEventListener('hashchange', setTodoFilter);
+        }}</Effect>
         <div className="todoapp">
           <header className="header">
             <h1>todos</h1>
