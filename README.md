@@ -41,4 +41,4 @@ const App = () => {
 export default App;
 ```
 
-[TodoMVC](./examples/TodoMVC)
+[TodoMVC](./examples/TodoMVC/index.js)
