@@ -1,5 +1,5 @@
 # vueactify
-> Reactive React components, powered by [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
+> React bindings for [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
 
 ## Installation
 

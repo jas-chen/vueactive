@@ -1,7 +1,7 @@
 {
   "name": "vueactify",
   "version": "0.1.1",
-  "description": "Reactive React components, powered by @vue/reactivity.",
+  "description": "React bindings for @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
   "repository": {
