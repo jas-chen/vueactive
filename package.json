@@ -1,5 +1,5 @@
 {
-  "name": "@jas-chen/vueactify",
+  "name": "vueactify",
   "version": "0.1.1",
   "description": "Reactive React components, powered by @vue/reactivity.",
   "author": "Jas Chen",
