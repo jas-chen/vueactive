@@ -1,17 +1,17 @@
 {
-  "name": "@jas-chen/reactive-components",
+  "name": "@jas-chen/vueactify",
   "version": "0.1.1",
   "description": "Reactive React components, powered by @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jas-chen/reactive-components.git"
+    "url": "git+https://github.com/jas-chen/vueactify.git"
   },
   "source": "src/index.js",
-  "main": "dist/reactive-components.js",
-  "module": "dist/reactive-components.module.js",
-  "umd:main": "dist/reactive-components.umd.js",
+  "main": "dist/vueactify.js",
+  "module": "dist/vueactify.module.js",
+  "umd:main": "dist/vueactify.umd.js",
   "scripts": {
     "build": "rm -rf dist && microbundle",
     "prepublishOnly": "yarn build"
@@ -28,7 +28,7 @@
     "react-dom": "16.13.1"
   },
   "bugs": {
-    "url": "https://github.com/jas-chen/reactive-components/issues"
+    "url": "https://github.com/jas-chen/vueactify/issues"
   },
-  "homepage": "https://github.com/jas-chen/reactive-components#readme"
+  "homepage": "https://github.com/jas-chen/vueactify#readme"
 }

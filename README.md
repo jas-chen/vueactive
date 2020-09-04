@@ -1,10 +1,10 @@
-# reactive-components
+# vueactify
 > Reactive React components, powered by [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
 
 ## Installation
 
 ```
-yarn add @jas-chen/reactive-components
+yarn add @jas-chen/vueactify
 ```
 
 ## Usage
@@ -14,7 +14,7 @@ Clock example
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
-import R, { Effect, useForceMemo } from "@jas-chen/reactive-components";
+import R, { Effect, useForceMemo } from "@jas-chen/vueactify";
 
 const App = () => {
   return useForceMemo(() => {
