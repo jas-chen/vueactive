@@ -72,4 +72,6 @@ export const Effect = ({ children }) => {
   return null;
 };
 
+export const useForceMemo = (factory) => useMemo(factory, []);
+
 export default Reactive;

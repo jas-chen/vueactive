@@ -1,6 +1,6 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import R, { Effect } from "@jas-chen/reactive-components";
+import R, { Effect, useForceMemo } from "@jas-chen/reactive-components";
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -21,10 +21,10 @@ const filterKeyLabelMap = {
 
 const hashes = Object.keys(hashFilterKeyMap);
 
-const isUrlValid = () => hashes.includes(location.hash);
+const isUrlValid = () => hashes.includes(window.location.hash);
 
 if (!isUrlValid()) {
-  location.hash = "#/";
+  window.location.hash = "#/";
 }
 
 const Layout = ({
@@ -71,8 +71,8 @@ const Layout = ({
 );
 
 const App = () => {
-  return useMemo(() => {
-    const todoFilter$ = ref(hashFilterKeyMap[location.hash]);
+  return useForceMemo(() => {
+    const todoFilter$ = ref(hashFilterKeyMap[window.location.hash]);
     const newTodo = (label) => ({
       id: new Date().getTime(),
       label: (label || "").trim(),
@@ -242,9 +242,9 @@ const App = () => {
           {() => {
             const setTodoFilter = () => {
               if (!isUrlValid()) {
-                location.hash = "#/";
+                window.location.hash = "#/";
               } else {
-                todoFilter$.value = hashFilterKeyMap[location.hash];
+                todoFilter$.value = hashFilterKeyMap[window.location.hash];
               }
             };
 
