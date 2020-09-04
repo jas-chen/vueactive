@@ -4,7 +4,7 @@
 ## Installation
 
 ```
-yarn add @jas-chen/vueactify
+yarn add vueactify
 ```
 
 ## Usage
@@ -14,7 +14,7 @@ Clock example
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
-import R, { Effect, useForceMemo } from "@jas-chen/vueactify";
+import R, { Effect, useForceMemo } from "vueactify";
 
 const App = () => {
   return useForceMemo(() => {
