@@ -1,4 +1,6 @@
 # vueactive
+[![npm version](https://img.shields.io/npm/v/vueactive.svg?style=flat-square)](https://www.npmjs.com/package/vueactive) [![gzip size](https://img.shields.io/bundlephobia/minzip/vueactive.svg?style=flat-square)](https://bundlephobia.com/result?p=vueactive)
+
 > React bindings for [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
 
 ## Installation
