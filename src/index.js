@@ -1,5 +1,18 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { effect, stop, unref } from "@vue/reactivity";
+import { effect as reactivityEffect, stop, shallowReactive } from "@vue/reactivity";
+
+const dumbEffect = (callback) => callback();
+
+let effect;
+
+export const setIsStaticRendering = (isStaticRendering) => {
+  effect = isStaticRendering ? dumbEffect : reactivityEffect;
+}
+
+// eslint-disable-next-line no-undef
+const isBrowser = typeof window !== 'undefined' && globalThis === window;
+
+setIsStaticRendering(!isBrowser);
 
 const scheduler = (() => {
   let jobs = new Set();
@@ -34,9 +47,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   );
 
   const effectRef = useRef();
-  const render = useMemo(() => {
-    return typeof children === "function" ? children : () => unref(children);
-  }, [children]);
+  const render = useMemo(() => children, [children]);
 
   const [element, setElement] = useState(() => {
     let _element;
@@ -73,5 +84,18 @@ export const Effect = ({ children }) => {
 };
 
 export const useForceMemo = (factory) => useMemo(factory, []);
+
+export const useReactiveProps = (props) => {
+  const props$ = useForceMemo(() => shallowReactive({ ...props }));
+  const keys = new Set([...Object.keys(props), ...Object.keys(props$)]);
+
+  for (const key of keys) {
+    if (props$[key] !== props[key]) {
+      props$[key] = props[key];
+    }
+  }
+
+  return props$;
+}
 
 export default Reactive;

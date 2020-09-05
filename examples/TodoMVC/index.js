@@ -208,7 +208,7 @@ const App = () => {
       <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
     );
 
-    const renderItemsLeft = () => <R>{itemsLeft$}</R>;
+    const renderItemsLeft = () => <R>{() => itemsLeft$.value}</R>;
 
     const renderFilters = () =>
       ["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (

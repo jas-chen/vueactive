@@ -32,7 +32,7 @@ const App = () => {
             return () => clearInterval(intervalId);
           }}
         </Effect>
-        <R>{time$}</R>
+        <R>{() => time$.value}</R>
       </>
     );
   });
