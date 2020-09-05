@@ -9,7 +9,7 @@
 yarn add vueactive
 ```
 
-## Usage
+## Examples
 
 Clock example
 
