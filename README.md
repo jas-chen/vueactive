@@ -14,7 +14,7 @@ Clock example
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
-import R, { Effect, useForceMemo } from "vueactive";
+import { R, Effect, useForceMemo } from "vueactive";
 
 const App = () => {
   return useForceMemo(() => {

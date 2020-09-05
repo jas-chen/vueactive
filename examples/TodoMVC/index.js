@@ -1,6 +1,6 @@
 import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import R, { Effect, useForceMemo } from "vueactive";
+import { R, Effect, useForceMemo } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",

@@ -35,7 +35,7 @@ const scheduler = (() => {
   };
 })();
 
-const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
+export const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   const effectOptions = useMemo(
     () => ({
       scheduler,
@@ -78,6 +78,8 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   return element;
 };
 
+export const R = Reactive;
+
 export const Effect = ({ children }) => {
   useEffect(children, [children]);
   return null;
@@ -97,5 +99,3 @@ export const useReactiveProps = (props) => {
 
   return props$;
 }
-
-export default Reactive;
