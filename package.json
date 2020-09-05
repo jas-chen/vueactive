@@ -4,6 +4,7 @@
   "description": "React bindings for @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jas-chen/vueactive.git"
