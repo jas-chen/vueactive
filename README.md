@@ -1,10 +1,10 @@
-# vueactify
+# vueactive
 > React bindings for [@vue/reactivity](https://www.npmjs.com/package/@vue/reactivity).
 
 ## Installation
 
 ```
-yarn add vueactify
+yarn add vueactive
 ```
 
 ## Usage
@@ -14,7 +14,7 @@ Clock example
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
-import R, { Effect, useForceMemo } from "vueactify";
+import R, { Effect, useForceMemo } from "vueactive";
 
 const App = () => {
   return useForceMemo(() => {

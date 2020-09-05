@@ -1,17 +1,17 @@
 {
-  "name": "vueactify",
+  "name": "vueactive",
   "version": "0.1.1",
   "description": "React bindings for @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jas-chen/vueactify.git"
+    "url": "git+https://github.com/jas-chen/vueactive.git"
   },
   "source": "src/index.js",
-  "main": "dist/vueactify.js",
-  "module": "dist/vueactify.module.js",
-  "umd:main": "dist/vueactify.umd.js",
+  "main": "dist/vueactive.js",
+  "module": "dist/vueactive.module.js",
+  "umd:main": "dist/vueactive.umd.js",
   "scripts": {
     "build": "rm -rf dist && microbundle",
     "prepublishOnly": "yarn build"
@@ -28,7 +28,7 @@
     "react-dom": "16.13.1"
   },
   "bugs": {
-    "url": "https://github.com/jas-chen/vueactify/issues"
+    "url": "https://github.com/jas-chen/vueactive/issues"
   },
-  "homepage": "https://github.com/jas-chen/vueactify#readme"
+  "homepage": "https://github.com/jas-chen/vueactive#readme"
 }
