@@ -71,3 +71,12 @@ export default Clock;
 ```
 
 [TodoMVC](./examples/TodoMVC/index.js)
+
+
+
+# Compare to MobX
+
+| @vue/reactivity | MobX |
+|---|---|
+| @vue/reactivity [![gzip size](https://img.shields.io/bundlephobia/minzip/@vue/reactivity.svg?style=flat-square)](https://bundlephobia.com/result?p=@vue/reactivity) | mobx@6 [![gzip size](https://img.shields.io/bundlephobia/minzip/mobx@6.0.0-rc.7.svg?style=flat-square)](https://bundlephobia.com/result?p=mobx@6.0.0-rc.7) |
+| vueactive [![gzip size](https://img.shields.io/bundlephobia/minzip/vueactive.svg?style=flat-square)](https://bundlephobia.com/result?p=vueactive) | mobx-react [![gzip size](https://img.shields.io/bundlephobia/minzip/mobx-react.svg?style=flat-square)](https://bundlephobia.com/result?p=mobx-react) |
