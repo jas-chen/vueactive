@@ -11,14 +11,39 @@ yarn add vueactive
 
 ## Examples
 
-Clock example
+Counter
+
+```js
+import React from "react";
+import { ref } from "@vue/reactivity";
+import { R, useForceMemo } from "./vueactive";
+
+const Counter = () => {
+  return useForceMemo(() => {
+    const count$ = ref(0);
+
+    return (
+      <>
+        <button onClick={() => count$.value--}>-</button>
+        <R>{() => count$.value}</R>
+        <button onClick={() => count$.value++}>+</button>
+      </>
+    );
+  });
+};
+
+export default Counter;
+```
+
+
+Clock
 
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
 import { R, Effect, useForceMemo } from "vueactive";
 
-const App = () => {
+const Clock = () => {
   return useForceMemo(() => {
     const time$ = ref(new Date().toLocaleTimeString());
     let intervalId;
@@ -40,7 +65,7 @@ const App = () => {
   });
 };
 
-export default App;
+export default Clock;
 ```
 
 [TodoMVC](./examples/TodoMVC/index.js)

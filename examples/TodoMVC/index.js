@@ -1,10 +1,10 @@
 import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import { R, Effect, useForceMemo } from "vueactive";
+import { R, Effect, useForceMemo } from "./vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
-  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">',
+  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
 );
 
 const hashFilterKeyMap = {
@@ -27,49 +27,6 @@ if (!isUrlValid()) {
   window.location.hash = "#/";
 }
 
-const Layout = ({
-  renderNewTodo,
-  renderToggleAll,
-  renderTodoList,
-  renderItemsLeft,
-  renderFilters,
-  onClearCompletedClick,
-}) => (
-  <>
-    <div className="todoapp">
-      <header className="header">
-        <h1>todos</h1>
-        {renderNewTodo()}
-      </header>
-
-      <section className="main">
-        {renderToggleAll()}
-        <label htmlFor="toggle-all" />
-        <ul className="todo-list">{renderTodoList()}</ul>
-      </section>
-
-      <footer className="footer">
-        <span className="todo-count">
-          <strong>{renderItemsLeft()}</strong> items left
-        </span>
-        <ul className="filters">{renderFilters()}</ul>
-        <button className="clear-completed" onClick={onClearCompletedClick}>
-          Clear completed
-        </button>
-      </footer>
-    </div>
-    <footer className="info">
-      <p>Double-click to edit a todo</p>
-      <p>
-        Created by <a href="http://github.com/jas-chen/">Jas Chen</a>
-      </p>
-      <p>
-        Part of <a href="http://todomvc.com">TodoMVC</a>
-      </p>
-    </footer>
-  </>
-);
-
 const App = () => {
   return useForceMemo(() => {
     const todoFilter$ = ref(hashFilterKeyMap[window.location.hash]);
@@ -88,17 +45,17 @@ const App = () => {
       return todoList$.filter(({ done }) => done === filterValue);
     });
     const itemsLeft$ = computed(() =>
-      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0),
+      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0)
     );
     const isAllCompleted$ = computed(
       () =>
         todoList$.length &&
         todoList$.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
-          todoList$.length,
+          todoList$.length
     );
 
     const newTodo$ = ref("");
-    const editingTodo$ = ref(null);
+    const editingTodo$ = reactive({});
 
     const onNewTodoChange = (e) => {
       newTodo$.value = e.target.value;
@@ -113,39 +70,6 @@ const App = () => {
       }
     };
 
-    const renderNewTodo = () => (
-      <R>
-        {() => (
-          <input
-            className="new-todo"
-            placeholder="What needs to be done?"
-            value={newTodo$.value}
-            onChange={onNewTodoChange}
-            onKeyPress={onAddTodo}
-          />
-        )}
-      </R>
-    );
-
-    const renderToggleAll = () => (
-      <R>
-        {() => (
-          <input
-            id="toggle-all"
-            type="checkbox"
-            className="toggle-all"
-            checked={isAllCompleted$.value}
-            onChange={() => {
-              const setTo = isAllCompleted$.value ? false : true;
-              todoList$.forEach((todo) => {
-                todo.done = setTo;
-              });
-            }}
-          />
-        )}
-      </R>
-    );
-
     const renderTodoItem = (todo) => {
       const destroyBtn = (
         <button
@@ -155,78 +79,64 @@ const App = () => {
       );
       return (
         <R key={todo.id}>
-          {() => (
-            <li
-              className={[
-                todo.done ? "completed" : "",
-                editingTodo$.value === todo ? "editing " : "",
-              ].join("")}
-            >
-              <div className="view">
-                <input
-                  type="checkbox"
-                  className="toggle"
-                  checked={todo.done}
-                  onChange={() => {
-                    todo.done = !todo.done;
-                  }}
-                />
-                <label
-                  onDoubleClick={() => {
-                    editingTodo$.value = todo;
-                  }}
-                >
-                  {todo.label}
-                </label>
-                {destroyBtn}
-              </div>
-              {editingTodo$.value === todo && (
-                <input
-                  className="edit"
-                  value={editingTodo$.value.label}
-                  ref={(input) => input && input.focus()}
-                  onChange={(e) => {
-                    editingTodo$.value.label = e.target.value;
-                  }}
-                  onBlur={() => {
-                    editingTodo$.value = null;
-                  }}
-                  onKeyDown={({ key }) => {
-                    if (["Enter", "Escape"].includes(key)) {
-                      editingTodo$.value = null;
-                    }
-                  }}
-                />
-              )}
-            </li>
-          )}
+          {() => {
+            const isEditing = editingTodo$.id === todo.id;
+            return (
+              <li
+                className={[
+                  todo.done ? "completed" : "",
+                  isEditing ? "editing " : "",
+                ].join("")}
+              >
+                <div className="view">
+                  <input
+                    type="checkbox"
+                    className="toggle"
+                    checked={todo.done}
+                    onChange={() => {
+                      todo.done = !todo.done;
+                    }}
+                  />
+                  <label
+                    onDoubleClick={() => {
+                      Object.assign(editingTodo$, todo);
+                    }}
+                  >
+                    <R>{() => todo.label}</R>
+                  </label>
+                  {destroyBtn}
+                </div>
+                {isEditing && (
+                  <R>
+                    {() => (
+                      <input
+                        className="edit"
+                        value={editingTodo$.label}
+                        ref={(input) => input && input.focus()}
+                        onChange={(e) => {
+                          editingTodo$.label = e.target.value;
+                        }}
+                        onBlur={() => {
+                          editingTodo$.id = null;
+                        }}
+                        onKeyDown={({ key }) => {
+                          if (["Enter", "Escape"].includes(key)) {
+                            if (key === "Enter") {
+                              todo.label = editingTodo$.label;
+                            }
+                            editingTodo$.id = null;
+                          }
+                        }}
+                      />
+                    )}
+                  </R>
+                )}
+              </li>
+            );
+          }}
         </R>
       );
     };
-
-    const renderTodoList = () => (
-      <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
-    );
-
-    const renderItemsLeft = () => <R>{() => itemsLeft$.value}</R>;
-
-    const renderFilters = () =>
-      ["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
-        <li key={filterKey}>
-          <R>
-            {() => (
-              <a
-                href={hashes.find(
-                  (hash) => hashFilterKeyMap[hash] === filterKey,
-                )}
-                className={todoFilter$.value === filterKey ? "selected" : ""}
-              >
-                {filterKeyLabelMap[filterKey]}
-              </a>
-            )}
-          </R>
-        </li>
-      ));
 
     const onClearCompletedClick = () => {
       const notCompletedTodoList = todoList$.filter(({ done }) => !done);
@@ -254,16 +164,86 @@ const App = () => {
               window.removeEventListener("hashchange", setTodoFilter);
           }}
         </Effect>
-        <Layout
-          {...{
-            renderNewTodo,
-            renderToggleAll,
-            renderTodoList,
-            renderItemsLeft,
-            renderFilters,
-            onClearCompletedClick,
-          }}
-        />
+        <div className="todoapp">
+          <header className="header">
+            <h1>todos</h1>
+            <R>
+              {() => (
+                <input
+                  className="new-todo"
+                  placeholder="What needs to be done?"
+                  value={newTodo$.value}
+                  onChange={onNewTodoChange}
+                  onKeyPress={onAddTodo}
+                />
+              )}
+            </R>
+          </header>
+
+          <section className="main">
+            <R>
+              {() => (
+                <input
+                  id="toggle-all"
+                  type="checkbox"
+                  className="toggle-all"
+                  checked={isAllCompleted$.value}
+                  onChange={() => {
+                    const setTo = isAllCompleted$.value ? false : true;
+                    todoList$.forEach((todo) => {
+                      todo.done = setTo;
+                    });
+                  }}
+                />
+              )}
+            </R>
+            <label htmlFor="toggle-all" />
+            <ul className="todo-list">
+              <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
+            </ul>
+          </section>
+
+          <footer className="footer">
+            <span className="todo-count">
+              <strong>
+                <R>{() => itemsLeft$.value}</R>
+              </strong>{" "}
+              items left
+            </span>
+            <ul className="filters">
+              {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
+                <li key={filterKey}>
+                  <R>
+                    {() => (
+                      <a
+                        href={hashes.find(
+                          (hash) => hashFilterKeyMap[hash] === filterKey
+                        )}
+                        className={
+                          todoFilter$.value === filterKey ? "selected" : ""
+                        }
+                      >
+                        {filterKeyLabelMap[filterKey]}
+                      </a>
+                    )}
+                  </R>
+                </li>
+              ))}
+            </ul>
+            <button className="clear-completed" onClick={onClearCompletedClick}>
+              Clear completed
+            </button>
+          </footer>
+        </div>
+        <footer className="info">
+          <p>Double-click to edit a todo</p>
+          <p>
+            Created by <a href="http://github.com/jas-chen/">Jas Chen</a>
+          </p>
+          <p>
+            Part of <a href="http://todomvc.com">TodoMVC</a>
+          </p>
+        </footer>
       </>
     );
   });
