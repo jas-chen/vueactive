@@ -43,9 +43,11 @@ import React from "react";
 import { ref } from "@vue/reactivity";
 import { R, Effect, useForceMemo } from "vueactive";
 
+const getLocaleTimeString = () => new Date().toLocaleTimeString();
+
 const Clock = () => {
   return useForceMemo(() => {
-    const time$ = ref(new Date().toLocaleTimeString());
+    const time$ = ref(getLocaleTimeString());
     let intervalId;
 
     return (
@@ -53,7 +55,7 @@ const Clock = () => {
         <Effect>
           {() => {
             intervalId = setInterval(() => {
-              time$.value = new Date().toLocaleTimeString();
+              time$.value = getLocaleTimeString();
             }, 1000);
 
             return () => clearInterval(intervalId);
