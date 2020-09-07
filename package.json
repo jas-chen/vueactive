@@ -11,10 +11,10 @@
   },
   "source": "src/index.js",
   "main": "dist/vueactive.js",
-  "module": "dist/vueactive.module.js",
+  "module": "dist/vueactive.modern.js",
   "umd:main": "dist/vueactive.umd.js",
   "scripts": {
-    "build": "rm -rf dist && microbundle",
+    "build": "rm -rf dist && microbundle -o dist -f cjs,umd,modern --no-compress",
     "prepublishOnly": "yarn build"
   },
   "peerDependencies": {

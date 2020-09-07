@@ -5,7 +5,7 @@ const dumbEffect = (callback) => callback();
 
 let effect;
 
-export const setIsStaticRendering = (isStaticRendering) => {
+const setIsStaticRendering = (isStaticRendering) => {
   effect = isStaticRendering ? dumbEffect : reactivityEffect;
 }
 
@@ -35,7 +35,7 @@ const scheduler = (() => {
   };
 })();
 
-export const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
+const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   const effectOptions = useMemo(
     () => ({
       scheduler,
@@ -78,16 +78,14 @@ export const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   return element;
 };
 
-export const R = Reactive;
-
-export const Effect = ({ children }) => {
+const Effect = ({ children }) => {
   useEffect(children, [children]);
   return null;
 };
 
-export const useForceMemo = (factory) => useMemo(factory, []);
+const useForceMemo = (factory) => useMemo(factory, []);
 
-export const useReactiveProps = (props) => {
+const useReactiveProps = (props) => {
   const props$ = useForceMemo(() => shallowReactive({ ...props }));
   const keys = new Set([...Object.keys(props), ...Object.keys(props$)]);
 
@@ -102,9 +100,9 @@ export const useReactiveProps = (props) => {
 
 const justTrue = () => true;
 
-export const forceMemo = (Component) => memo(Component, justTrue);
+const forceMemo = (Component) => memo(Component, justTrue);
 
-export const ForceMemo = new Proxy(new Map(), {
+const ForceMemo = new Proxy(new Map(), {
   get(target, tagName) {
     let Component = target.get(tagName);
     if (!Component) {
@@ -116,4 +114,14 @@ export const ForceMemo = new Proxy(new Map(), {
   }
 });
 
-export const M = ForceMemo;
+export {
+  setIsStaticRendering,
+  Reactive,
+  Reactive as R,
+  Effect,
+  useForceMemo,
+  useReactiveProps,
+  forceMemo,
+  ForceMemo,
+  ForceMemo as M,
+};
