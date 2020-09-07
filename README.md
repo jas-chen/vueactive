@@ -16,7 +16,7 @@ Counter
 ```js
 import React from "react";
 import { ref } from "@vue/reactivity";
-import { R, useForceMemo } from "./vueactive";
+import { R, useForceMemo } from "vueactive";
 
 const Counter = () => {
   return useForceMemo(() => {

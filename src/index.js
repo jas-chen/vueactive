@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, memo, Fragment, createElement } from "react";
 import { effect as reactivityEffect, stop, shallowReactive } from "@vue/reactivity";
 
 const dumbEffect = (callback) => callback();
@@ -99,3 +99,21 @@ export const useReactiveProps = (props) => {
 
   return props$;
 }
+
+const justTrue = () => true;
+
+export const forceMemo = (Component) => memo(Component, justTrue);
+
+export const ForceMemo = new Proxy(new Map(), {
+  get(target, tagName) {
+    let Component = target.get(tagName);
+    if (!Component) {
+      Component = forceMemo((props) => createElement(tagName === 'Fragment' ? Fragment : tagName, props));
+      target.set(tagName, Component);
+    }
+
+    return Component;
+  }
+});
+
+export const M = ForceMemo;

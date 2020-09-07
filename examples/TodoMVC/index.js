@@ -1,6 +1,6 @@
 import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import { R, Effect, useForceMemo } from "./vueactive";
+import { R, M, Effect, useForceMemo } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -71,12 +71,6 @@ const App = () => {
     };
 
     const renderTodoItem = (todo) => {
-      const destroyBtn = (
-        <button
-          className="destroy"
-          onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
-        />
-      );
       return (
         <R key={todo.id}>
           {() => {
@@ -88,15 +82,17 @@ const App = () => {
                   isEditing ? "editing " : "",
                 ].join("")}
               >
-                <div className="view">
-                  <input
-                    type="checkbox"
-                    className="toggle"
-                    checked={todo.done}
-                    onChange={() => {
-                      todo.done = !todo.done;
-                    }}
-                  />
+                <M.div className="view">
+                  <R>{() => (
+                    <input
+                      type="checkbox"
+                      className="toggle"
+                      checked={todo.done}
+                      onChange={() => {
+                        todo.done = !todo.done;
+                      }}
+                    />
+                  )}</R>
                   <label
                     onDoubleClick={() => {
                       Object.assign(editingTodo$, todo);
@@ -104,8 +100,11 @@ const App = () => {
                   >
                     <R>{() => todo.label}</R>
                   </label>
-                  {destroyBtn}
-                </div>
+                  <button
+                    className="destroy"
+                    onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
+                  />
+                </M.div>
                 {isEditing && (
                   <R>
                     {() => (
@@ -189,9 +188,9 @@ const App = () => {
                   className="toggle-all"
                   checked={isAllCompleted$.value}
                   onChange={() => {
-                    const setTo = isAllCompleted$.value ? false : true;
+                    const done = isAllCompleted$.value ? false : true;
                     todoList$.forEach((todo) => {
-                      todo.done = setTo;
+                      todo.done = done;
                     });
                   }}
                 />
