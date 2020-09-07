@@ -74,7 +74,7 @@ export default Clock;
 
 
 
-# Compare to MobX
+## Compare to MobX
 
 | @vue/reactivity | MobX |
 |---|---|
