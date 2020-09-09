@@ -25,7 +25,7 @@ const Counter = () => {
     return (
       <>
         <button onClick={() => count$.value--}>-</button>
-        <R>{() => count$.value}</R>
+        <R>{count$}</R>
         <button onClick={() => count$.value++}>+</button>
       </>
     );
@@ -61,7 +61,7 @@ const Clock = () => {
             return () => clearInterval(intervalId);
           }}
         </Effect>
-        <R>{() => time$.value}</R>
+        <R>{time$}</R>
       </>
     );
   });

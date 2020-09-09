@@ -1,6 +1,6 @@
 import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import { R, M, Effect, useForceMemo } from "vueactive";
+import { R, ForceMemo, Effect, useForceMemo } from "./vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -82,7 +82,7 @@ const App = () => {
                   isEditing ? "editing " : "",
                 ].join("")}
               >
-                <M.div className="view">
+                <ForceMemo.div className="view">
                   <R>{() => (
                     <input
                       type="checkbox"
@@ -104,7 +104,7 @@ const App = () => {
                     className="destroy"
                     onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
                   />
-                </M.div>
+                </ForceMemo.div>
                 {isEditing && (
                   <R>
                     {() => (
@@ -205,7 +205,7 @@ const App = () => {
           <footer className="footer">
             <span className="todo-count">
               <strong>
-                <R>{() => itemsLeft$.value}</R>
+                <R>{itemsLeft$}</R>
               </strong>{" "}
               items left
             </span>

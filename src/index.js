@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, Fragment, createElement } from "react";
-import { effect as reactivityEffect, stop, shallowReactive } from "@vue/reactivity";
+import { effect as reactivityEffect, stop, shallowReactive, unref } from "@vue/reactivity";
 
 const dumbEffect = (callback) => callback();
 
@@ -47,7 +47,10 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
   );
 
   const effectRef = useRef();
-  const render = useMemo(() => children, [children]);
+  const render = useMemo(
+    () => typeof children === 'function' ? children : () => unref(children),
+    [children],
+  );
 
   const [element, setElement] = useState(() => {
     let _element;
@@ -83,7 +86,8 @@ const Effect = ({ children }) => {
   return null;
 };
 
-const useForceMemo = (factory) => useMemo(factory, []);
+const emptyArray = [];
+const useForceMemo = (factory) => useMemo(factory, emptyArray);
 
 const useReactiveProps = (props) => {
   const props$ = useForceMemo(() => shallowReactive({ ...props }));
@@ -119,5 +123,4 @@ export {
   useForceMemo,
   useReactiveProps,
   ForceMemo,
-  ForceMemo as M,
 };
