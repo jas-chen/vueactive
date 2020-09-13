@@ -1,10 +1,10 @@
 import React from "react";
 import { ref, reactive, computed } from "@vue/reactivity";
-import { R, ForceMemo, Effect, useForceMemo } from "./vueactive";
+import { R, Effect, useForceMemo } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
-  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
+  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">',
 );
 
 const hashFilterKeyMap = {
@@ -26,6 +26,92 @@ const isUrlValid = () => hashes.includes(window.location.hash);
 if (!isUrlValid()) {
   window.location.hash = "#/";
 }
+const Rerendr = () => {
+  console.log("rerenderd");
+  return null;
+};
+
+const TodoItem = ({ todo, editingTodo, onDestroy }) => {
+  return useForceMemo(() => {
+    const checkbox = (
+      <R>
+        {() => (
+          <input
+            type="checkbox"
+            className="toggle"
+            checked={todo.done}
+            onChange={() => {
+              todo.done = !todo.done;
+            }}
+          />
+        )}
+      </R>
+    );
+
+    const label = <R>{() => todo.label}</R>;
+
+    const editInput = (
+      <R>
+        {() =>
+          editingTodo.id === todo.id && (
+            <input
+              className="edit"
+              value={editingTodo.label}
+              ref={(input) => input && input.focus()}
+              onChange={(e) => {
+                editingTodo.label = e.target.value;
+              }}
+              onBlur={() => {
+                editingTodo.id = null;
+              }}
+              onKeyDown={({ key }) => {
+                if (["Enter", "Escape"].includes(key)) {
+                  if (key === "Enter") {
+                    todo.label = editingTodo.label;
+                  }
+                  editingTodo.id = null;
+                }
+              }}
+            />
+          )
+        }
+      </R>
+    );
+
+    const view = (
+      <div className="view">
+        <Rerendr />
+        {checkbox}
+        <label
+          onDoubleClick={() => {
+            Object.assign(editingTodo, todo);
+          }}
+        >
+          {label}
+        </label>
+        <button className="destroy" onClick={() => onDestroy(todo)} />
+      </div>
+    );
+
+    return (
+      <R>
+        {() => {
+          return (
+            <li
+              className={[
+                todo.done ? "completed" : "",
+                editingTodo.id === todo.id ? "editing " : "",
+              ].join(" ")}
+            >
+              {view}
+              {editInput}
+            </li>
+          );
+        }}
+      </R>
+    );
+  });
+};
 
 const App = () => {
   return useForceMemo(() => {
@@ -45,13 +131,13 @@ const App = () => {
       return todoList$.filter(({ done }) => done === filterValue);
     });
     const itemsLeft$ = computed(() =>
-      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0)
+      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0),
     );
     const isAllCompleted$ = computed(
       () =>
         todoList$.length &&
         todoList$.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
-          todoList$.length
+          todoList$.length,
     );
 
     const newTodo$ = ref("");
@@ -70,72 +156,15 @@ const App = () => {
       }
     };
 
-    const renderTodoItem = (todo) => {
-      return (
-        <R key={todo.id}>
-          {() => {
-            const isEditing = editingTodo$.id === todo.id;
-            return (
-              <li
-                className={[
-                  todo.done ? "completed" : "",
-                  isEditing ? "editing " : "",
-                ].join("")}
-              >
-                <ForceMemo.div className="view">
-                  <R>{() => (
-                    <input
-                      type="checkbox"
-                      className="toggle"
-                      checked={todo.done}
-                      onChange={() => {
-                        todo.done = !todo.done;
-                      }}
-                    />
-                  )}</R>
-                  <label
-                    onDoubleClick={() => {
-                      Object.assign(editingTodo$, todo);
-                    }}
-                  >
-                    <R>{() => todo.label}</R>
-                  </label>
-                  <button
-                    className="destroy"
-                    onClick={() => todoList$.splice(todoList$.indexOf(todo), 1)}
-                  />
-                </ForceMemo.div>
-                {isEditing && (
-                  <R>
-                    {() => (
-                      <input
-                        className="edit"
-                        value={editingTodo$.label}
-                        ref={(input) => input && input.focus()}
-                        onChange={(e) => {
-                          editingTodo$.label = e.target.value;
-                        }}
-                        onBlur={() => {
-                          editingTodo$.id = null;
-                        }}
-                        onKeyDown={({ key }) => {
-                          if (["Enter", "Escape"].includes(key)) {
-                            if (key === "Enter") {
-                              todo.label = editingTodo$.label;
-                            }
-                            editingTodo$.id = null;
-                          }
-                        }}
-                      />
-                    )}
-                  </R>
-                )}
-              </li>
-            );
-          }}
-        </R>
-      );
-    };
+    const destroy = (todo) => todoList$.splice(todoList$.indexOf(todo), 1);
+    const renderTodoItem = (todo) => (
+      <TodoItem
+        key={todo.id}
+        todo={todo}
+        editingTodo={editingTodo$}
+        onDestroy={destroy}
+      />
+    );
 
     const onClearCompletedClick = () => {
       const notCompletedTodoList = todoList$.filter(({ done }) => !done);
@@ -216,7 +245,7 @@ const App = () => {
                     {() => (
                       <a
                         href={hashes.find(
-                          (hash) => hashFilterKeyMap[hash] === filterKey
+                          (hash) => hashFilterKeyMap[hash] === filterKey,
                         )}
                         className={
                           todoFilter$.value === filterKey ? "selected" : ""

@@ -1,5 +1,10 @@
-import { useMemo, useState, useEffect, useRef, Fragment, createElement } from "react";
-import { effect as reactivityEffect, stop, shallowReactive, unref } from "@vue/reactivity";
+import { useMemo, useState, useEffect, useRef } from "react";
+import {
+  effect as reactivityEffect,
+  stop,
+  shallowReactive,
+  unref,
+} from "@vue/reactivity";
 
 const dumbEffect = (callback) => callback();
 
@@ -7,10 +12,10 @@ let effect;
 
 const setIsStaticRendering = (isStaticRendering) => {
   effect = isStaticRendering ? dumbEffect : reactivityEffect;
-}
+};
 
 // eslint-disable-next-line no-undef
-const isBrowser = typeof window !== 'undefined' && globalThis === window;
+const isBrowser = typeof window !== "undefined" && globalThis === window;
 
 setIsStaticRendering(!isBrowser);
 
@@ -48,7 +53,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
 
   const effectRef = useRef();
   const render = useMemo(
-    () => typeof children === 'function' ? children : () => unref(children),
+    () => (typeof children === "function" ? children : () => unref(children)),
     [children],
   );
 
@@ -67,6 +72,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
 
   useEffect(() => {
     if (!effectRef.current) {
+      console.warn("reference changed", children);
       effectRef.current = effect(() => {
         setElement(render());
       }, effectOptions);
@@ -76,7 +82,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
       stop(effectRef.current);
       effectRef.current = undefined;
     };
-  }, [render, effectOptions]);
+  }, [children, render, effectOptions]);
 
   return element;
 };
@@ -100,20 +106,7 @@ const useReactiveProps = (props) => {
   }
 
   return props$;
-}
-
-const ForceMemo = new Proxy(new Map(), {
-  get(target, tagName) {
-    let Component = target.get(tagName);
-    if (!Component) {
-      Component = (props) => useForceMemo(() => createElement(tagName === 'Fragment' ? Fragment : tagName, props));
-      Component.displayName = `ForceMemo.${tagName}`;
-      target.set(tagName, Component);
-    }
-
-    return Component;
-  }
-});
+};
 
 export {
   setIsStaticRendering,
@@ -122,5 +115,4 @@ export {
   Effect,
   useForceMemo,
   useReactiveProps,
-  ForceMemo,
 };
