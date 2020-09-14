@@ -65,10 +65,11 @@ const Reactive = ({
 
     let _element;
     effectRef.current = effect(() => {
-      if (!effectRef.current) {
-        _element = render();
-      } else {
-        setElement(render());
+      // trigger tracking
+      _element = render();
+
+      if (effectRef.current) {
+        setElement(_element);
       }
     }, effectOptions);
 
