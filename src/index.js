@@ -40,7 +40,13 @@ const scheduler = (() => {
   };
 })();
 
-const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
+const Reactive = ({
+  children,
+  onTrack,
+  onTrigger,
+  onStop,
+  showReRenderWarning = true,
+}) => {
   const effectOptions = useMemo(
     () => ({
       scheduler,
@@ -48,16 +54,15 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
       onTrigger,
       onStop,
     }),
-    [onTrack, onTrigger, onStop],
+    [onTrack, onTrigger, onStop]
   );
 
   const effectRef = useRef();
-  const render = useMemo(
-    () => (typeof children === "function" ? children : () => unref(children)),
-    [children],
-  );
 
   const [element, setElement] = useState(() => {
+    const render =
+      typeof children === "function" ? children : () => unref(children);
+
     let _element;
     effectRef.current = effect(() => {
       if (!effectRef.current) {
@@ -72,7 +77,16 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
 
   useEffect(() => {
     if (!effectRef.current) {
-      console.warn("reference changed", children);
+      if (process.env.NODE_ENV !== "production" && showReRenderWarning) {
+        console.warn(
+          "A <Reactive> element has re-rended. It would be better to keep the reference of the element to avoid the re-rendering.\n",
+          children
+        );
+      }
+
+      const render =
+        typeof children === "function" ? children : () => unref(children);
+
       effectRef.current = effect(() => {
         setElement(render());
       }, effectOptions);
@@ -82,7 +96,7 @@ const Reactive = ({ children, onTrack, onTrigger, onStop }) => {
       stop(effectRef.current);
       effectRef.current = undefined;
     };
-  }, [children, render, effectOptions]);
+  }, [children, effectOptions, showReRenderWarning]);
 
   return element;
 };
