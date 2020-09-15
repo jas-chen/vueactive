@@ -3,6 +3,8 @@ import {
   effect as reactivityEffect,
   stop,
   shallowReactive,
+  ref,
+  readonly,
   unref,
 } from "@vue/reactivity";
 
@@ -45,7 +47,7 @@ const Reactive = ({
   onTrack,
   onTrigger,
   onStop,
-  showReRenderWarning = true,
+  disableReRenderWarning,
 }) => {
   const effectOptions = useMemo(
     () => ({
@@ -78,7 +80,7 @@ const Reactive = ({
 
   useEffect(() => {
     if (!effectRef.current) {
-      if (process.env.NODE_ENV !== "production" && showReRenderWarning) {
+      if (process.env.NODE_ENV !== "production" && !disableReRenderWarning) {
         console.warn(
           "A <Reactive> element has re-rended. It would be better to keep the reference of the element to avoid the re-rendering.\n",
           children
@@ -97,7 +99,7 @@ const Reactive = ({
       stop(effectRef.current);
       effectRef.current = undefined;
     };
-  }, [children, effectOptions, showReRenderWarning]);
+  }, [children, effectOptions, disableReRenderWarning]);
 
   return element;
 };
@@ -123,6 +125,14 @@ const useReactiveProps = (props) => {
   return props$;
 };
 
+const readonlyRef = (value) => {
+  const value$ = ref(value);
+  const setValue = (newValue) => {
+    value$.value = newValue;
+  };
+  return [readonly(value$), setValue];
+};
+
 export {
   setIsStaticRendering,
   Reactive,
@@ -130,4 +140,5 @@ export {
   Effect,
   useForceMemo,
   useReactiveProps,
+  readonlyRef,
 };

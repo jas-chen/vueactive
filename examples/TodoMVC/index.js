@@ -1,77 +1,99 @@
-import React from "react";
-import { ref, reactive, computed } from "@vue/reactivity";
-import { R, Effect, useForceMemo } from "vueactive";
+import React, { useState } from "react";
+import { ref, reactive, computed, readonly } from "@vue/reactivity";
+import { R, useForceMemo, readonlyRef } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
-  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">',
+  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
 );
 
-const hashFilterKeyMap = {
+const createRouter = (routerConfig, defaultUrl = "#/") => {
+  const paths = Object.keys(routerConfig);
+  const isPathValid = () => paths.includes(window.location.hash);
+
+  if (!isPathValid()) {
+    window.location.hash = defaultUrl;
+  }
+
+  const routeName$ = ref(routerConfig[window.location.hash]);
+
+  window.addEventListener("hashchange", () => {
+    if (!isPathValid()) {
+      window.location.hash = defaultUrl;
+    } else {
+      routeName$.value = routerConfig[window.location.hash];
+    }
+  });
+
+  return {
+    routeName$,
+    getPath: (routeName) =>
+      paths.find((hash) => routerConfig[hash] === routeName),
+  };
+};
+
+const Router = createRouter({
   "#/": "ALL",
   "#/active": "ACTIVE",
   "#/completed": "COMPLETED",
+});
+
+const NewTodoInput = ({ onSubmit }) => {
+  const [label, setLabel] = useState("");
+  return (
+    <input
+      className="new-todo"
+      placeholder="What needs to be done?"
+      value={label}
+      onChange={(e) => setLabel(e.target.value)}
+      onKeyPress={(e) => {
+        if (e.key === "Enter" && label) {
+          onSubmit(label);
+          setLabel("");
+        }
+      }}
+    />
+  );
 };
 
-const filterKeyLabelMap = {
-  ALL: "All",
-  ACTIVE: "Active",
-  COMPLETED: "Completed",
+const EditTodoInput = ({ initLabel, onCancel, onSubmit }) => {
+  const [label, setLabel] = useState(initLabel);
+  return (
+    <input
+      className="edit"
+      value={label}
+      ref={(input) => input && input.focus()}
+      onChange={(e) => setLabel(e.target.value)}
+      onBlur={onCancel}
+      onKeyDown={({ key }) => {
+        if (key === "Enter") {
+          onSubmit(label);
+        } else if (key === "Escape") {
+          onCancel();
+        }
+      }}
+    />
+  );
 };
 
-const hashes = Object.keys(hashFilterKeyMap);
-
-const isUrlValid = () => hashes.includes(window.location.hash);
-
-if (!isUrlValid()) {
-  window.location.hash = "#/";
-}
-const Rerendr = () => {
-  console.log("rerenderd");
-  return null;
-};
-
-const TodoItem = ({ todo, editingTodo, onDestroy }) => {
+const TodoItem = ({
+  todo,
+  editingTodoId,
+  onStartEditing,
+  onCancel,
+  onSubmit,
+  onToggleCompleted,
+  onDestroy,
+}) => {
   return useForceMemo(() => {
-    const checkbox = (
-      <R>
-        {() => (
-          <input
-            type="checkbox"
-            className="toggle"
-            checked={todo.done}
-            onChange={() => {
-              todo.done = !todo.done;
-            }}
-          />
-        )}
-      </R>
-    );
-
-    const label = <R>{() => todo.label}</R>;
-
     const editInput = (
       <R>
         {() =>
-          editingTodo.id === todo.id && (
-            <input
-              className="edit"
-              value={editingTodo.label}
-              ref={(input) => input && input.focus()}
-              onChange={(e) => {
-                editingTodo.label = e.target.value;
-              }}
-              onBlur={() => {
-                editingTodo.id = null;
-              }}
-              onKeyDown={({ key }) => {
-                if (["Enter", "Escape"].includes(key)) {
-                  if (key === "Enter") {
-                    todo.label = editingTodo.label;
-                  }
-                  editingTodo.id = null;
-                }
-              }}
+          editingTodoId.value === todo.id && (
+            <EditTodoInput
+              initLabel={todo.label}
+              onCancel={onCancel}
+              onSubmit={(label) => onSubmit(todo, label)}
             />
           )
         }
@@ -80,14 +102,18 @@ const TodoItem = ({ todo, editingTodo, onDestroy }) => {
 
     const view = (
       <div className="view">
-        <Rerendr />
-        {checkbox}
-        <label
-          onDoubleClick={() => {
-            Object.assign(editingTodo, todo);
-          }}
-        >
-          {label}
+        <R>
+          {() => (
+            <input
+              type="checkbox"
+              className="toggle"
+              checked={todo.done}
+              onChange={() => onToggleCompleted(todo)}
+            />
+          )}
+        </R>
+        <label onDoubleClick={() => onStartEditing(todo)}>
+          <R>{() => todo.label}</R>
         </label>
         <button className="destroy" onClick={() => onDestroy(todo)} />
       </div>
@@ -100,7 +126,7 @@ const TodoItem = ({ todo, editingTodo, onDestroy }) => {
             <li
               className={[
                 todo.done ? "completed" : "",
-                editingTodo.id === todo.id ? "editing " : "",
+                editingTodoId.value === todo.id ? "editing " : "",
               ].join(" ")}
             >
               {view}
@@ -113,101 +139,124 @@ const TodoItem = ({ todo, editingTodo, onDestroy }) => {
   });
 };
 
-const App = () => {
-  return useForceMemo(() => {
-    const todoFilter$ = ref(hashFilterKeyMap[window.location.hash]);
-    const newTodo = (label) => ({
+const filterKeyLabelMap = {
+  ALL: "All",
+  ACTIVE: "Active",
+  COMPLETED: "Completed",
+};
+
+const createTodoList = () => {
+  const todoList = reactive([]);
+  const addTodo = (label) =>
+    todoList.unshift({
       id: new Date().getTime(),
       label: (label || "").trim(),
       done: false,
     });
-    const todoList$ = reactive([]);
+  const updateTodo = (todo, data) => {
+    Object.assign(
+      todoList.find(({ id }) => id === todo.id),
+      data
+    );
+  };
+  const deleteTodo = (todo) =>
+    todoList.splice(
+      todoList.findIndex(({ id }) => id === todo.id),
+      1
+    );
+  const filterTodo = (fn) => {
+    const leftTodo = todoList.filter(fn);
+    todoList.length = leftTodo.length;
+    leftTodo.forEach((todo, i) => {
+      todoList[i] = todo;
+    });
+  };
+
+  return {
+    todoList: readonly(todoList),
+    addTodo,
+    updateTodo,
+    deleteTodo,
+    filterTodo,
+  };
+};
+
+const App = ({ routeName$ = Router.routeName$ }) => {
+  const {
+    todoList,
+    addTodo,
+    updateTodo,
+    deleteTodo,
+    filterTodo,
+  } = useForceMemo(createTodoList);
+
+  return useForceMemo(() => {
     const filteredTodoList$ = computed(() => {
-      if (todoFilter$.value === "ALL") {
-        return todoList$;
+      if (routeName$.value === "ALL") {
+        return todoList;
       }
 
-      const filterValue = todoFilter$.value === "COMPLETED";
-      return todoList$.filter(({ done }) => done === filterValue);
+      const filterValue = routeName$.value === "COMPLETED";
+      return todoList.filter(({ done }) => done === filterValue);
     });
+
     const itemsLeft$ = computed(() =>
-      todoList$.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0),
+      todoList.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0)
     );
+
     const isAllCompleted$ = computed(
       () =>
-        todoList$.length &&
-        todoList$.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
-          todoList$.length,
+        todoList.length &&
+        todoList.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
+          todoList.length
     );
 
-    const newTodo$ = ref("");
-    const editingTodo$ = reactive({});
-
-    const onNewTodoChange = (e) => {
-      newTodo$.value = e.target.value;
-    };
-    const onAddTodo = (e) => {
-      if (e.key === "Enter") {
-        const { value } = newTodo$;
-        if (value) {
-          todoList$.unshift(newTodo(value));
-          newTodo$.value = "";
-        }
-      }
-    };
-
-    const destroy = (todo) => todoList$.splice(todoList$.indexOf(todo), 1);
-    const renderTodoItem = (todo) => (
-      <TodoItem
-        key={todo.id}
-        todo={todo}
-        editingTodo={editingTodo$}
-        onDestroy={destroy}
-      />
-    );
-
-    const onClearCompletedClick = () => {
-      const notCompletedTodoList = todoList$.filter(({ done }) => !done);
-      todoList$.length = notCompletedTodoList.length;
-      notCompletedTodoList.forEach((todo, i) => {
-        todoList$[i] = todo;
+    const onToggleAll = () => {
+      const done = isAllCompleted$.value ? false : true;
+      todoList.forEach((todo) => {
+        updateTodo(todo, { done });
       });
     };
 
+    const renderTodoItem = (() => {
+      const [editingTodoId$, setEditingTodoId] = readonlyRef(null);
+      const onEditTodo = (todo, label) => updateTodo(todo, { label });
+      const onToggleCompleted = (todo) => {
+        updateTodo(todo, { done: !todo.done });
+      };
+      const onCancel = () => setEditingTodoId(null);
+      const onSubmit = (todo, label) => {
+        updateTodo(todo, { label });
+        setEditingTodoId(null);
+      };
+      const onStartEditing = (todo) => {
+        setEditingTodoId(todo.id);
+      };
+
+      return (todo) => (
+        <TodoItem
+          key={todo.id}
+          todo={todo}
+          editingTodoId={editingTodoId$}
+          onDestroy={deleteTodo}
+          onToggleCompleted={onToggleCompleted}
+          onStartEditing={onStartEditing}
+          onEditTodo={onEditTodo}
+          onCancel={onCancel}
+          onSubmit={onSubmit}
+        />
+      );
+    })();
+
+    const onClearCompletedClick = () => filterTodo(({ done }) => !done);
+
     return (
       <>
-        <Effect>
-          {() => {
-            const setTodoFilter = () => {
-              if (!isUrlValid()) {
-                window.location.hash = "#/";
-              } else {
-                todoFilter$.value = hashFilterKeyMap[window.location.hash];
-              }
-            };
-
-            window.addEventListener("hashchange", setTodoFilter);
-
-            return () =>
-              window.removeEventListener("hashchange", setTodoFilter);
-          }}
-        </Effect>
         <div className="todoapp">
           <header className="header">
             <h1>todos</h1>
-            <R>
-              {() => (
-                <input
-                  className="new-todo"
-                  placeholder="What needs to be done?"
-                  value={newTodo$.value}
-                  onChange={onNewTodoChange}
-                  onKeyPress={onAddTodo}
-                />
-              )}
-            </R>
+            <NewTodoInput onSubmit={addTodo} />
           </header>
-
           <section className="main">
             <R>
               {() => (
@@ -216,12 +265,7 @@ const App = () => {
                   type="checkbox"
                   className="toggle-all"
                   checked={isAllCompleted$.value}
-                  onChange={() => {
-                    const done = isAllCompleted$.value ? false : true;
-                    todoList$.forEach((todo) => {
-                      todo.done = done;
-                    });
-                  }}
+                  onChange={onToggleAll}
                 />
               )}
             </R>
@@ -244,11 +288,9 @@ const App = () => {
                   <R>
                     {() => (
                       <a
-                        href={hashes.find(
-                          (hash) => hashFilterKeyMap[hash] === filterKey,
-                        )}
+                        href={Router.getPath(filterKey)}
                         className={
-                          todoFilter$.value === filterKey ? "selected" : ""
+                          routeName$.value === filterKey ? "selected" : ""
                         }
                       >
                         {filterKeyLabelMap[filterKey]}
