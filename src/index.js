@@ -72,61 +72,45 @@ const createRender = (Component) => {
 };
 
 const createReactiveComponent = (Component) => {
-  const Reactive = ({ onTrack, onTrigger, onStop, ...restProps }) => {
-    const effectOptions = useMemo(
-      () => ({
-        scheduler,
-        onTrack,
-        onTrigger,
-        onStop,
-      }),
-      [onTrack, onTrigger, onStop]
-    );
-
+  const ReactiveComponent = ({ onTrack, onTrigger, onStop, ...restProps }) => {
     const effectRef = useRef();
 
     const [element, setElement] = useState(() => {
       const render = createRender(Component);
 
       let _element;
-      effectRef.current = effect(() => {
-        // trigger tracking
-        _element = render(restProps);
+      effectRef.current = effect(
+        () => {
+          // trigger tracking
+          _element = render(restProps);
 
-        if (effectRef.current) {
-          setElement(_element);
+          if (effectRef.current) {
+            setElement(_element);
+          }
+        },
+        {
+          scheduler,
+          onTrack,
+          onTrigger,
+          onStop,
         }
-      }, effectOptions);
+      );
 
       return _element;
     });
 
-    useEffect(() => {
-      if (!effectRef.current) {
-        const render = createRender(Component);
-
-        effectRef.current = effect(() => {
-          setElement(render(restProps));
-        }, effectOptions);
-      }
-
-      return () => {
-        stop(effectRef.current);
-        effectRef.current = undefined;
-      };
-    }, [effectOptions]);
+    useEffect(() => () => stop(effectRef.current), []);
 
     return element;
   };
 
-  if (Component) {
-    Reactive.displayName =
-      typeof Component === "string"
-        ? `R.${Component}`
-        : Component.displayName || Component.name;
-  }
+  ReactiveComponent.displayName = `R.${
+    typeof Component === "string"
+      ? Component
+      : Component.displayName || Component.name
+  }`;
 
-  return Reactive;
+  return ReactiveComponent;
 };
 
 const R = new Proxy(new Map(), {
