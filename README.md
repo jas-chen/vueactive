@@ -25,7 +25,7 @@ const Counter = () => {
     return (
       <>
         <button onClick={() => count$.value--}>-</button>
-        <R>{count$}</R>
+        <R.Fragment>{count$}</R.Fragment>
         <button onClick={() => count$.value++}>+</button>
       </>
     );
@@ -61,7 +61,7 @@ const Clock = () => {
             return () => clearInterval(intervalId);
           }}
         </Effect>
-        <R>{time$}</R>
+        <R.h1>{time$}</R.h1>
       </>
     );
   });

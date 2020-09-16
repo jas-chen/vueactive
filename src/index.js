@@ -1,4 +1,11 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import {
+  Fragment,
+  createElement,
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import {
   effect as reactivityEffect,
   stop,
@@ -42,67 +49,96 @@ const scheduler = (() => {
   };
 })();
 
-const Reactive = ({
-  children,
-  onTrack,
-  onTrigger,
-  onStop,
-  disableReRenderWarning,
-}) => {
-  const effectOptions = useMemo(
-    () => ({
-      scheduler,
-      onTrack,
-      onTrigger,
-      onStop,
-    }),
-    [onTrack, onTrigger, onStop]
-  );
-
-  const effectRef = useRef();
-
-  const [element, setElement] = useState(() => {
-    const render =
-      typeof children === "function" ? children : () => unref(children);
-
-    let _element;
-    effectRef.current = effect(() => {
-      // trigger tracking
-      _element = render();
-
-      if (effectRef.current) {
-        setElement(_element);
+const createRender = (Component) => {
+  const isBuiltinComponent = typeof Component === "string";
+  return (props) => {
+    const finalProps = {};
+    for (const [key, value] of Object.entries(props)) {
+      if (
+        isBuiltinComponent &&
+        typeof value === "function" &&
+        !/on[A-Z]/.test(key)
+      ) {
+        finalProps[key] = value();
+      } else {
+        finalProps[key] = unref(value);
       }
-    }, effectOptions);
-
-    return _element;
-  });
-
-  useEffect(() => {
-    if (!effectRef.current) {
-      if (process.env.NODE_ENV !== "production" && !disableReRenderWarning) {
-        console.warn(
-          "A <Reactive> element has re-rended. It would be better to keep the reference of the element to avoid the re-rendering.\n",
-          children
-        );
-      }
-
-      const render =
-        typeof children === "function" ? children : () => unref(children);
-
-      effectRef.current = effect(() => {
-        setElement(render());
-      }, effectOptions);
     }
-
-    return () => {
-      stop(effectRef.current);
-      effectRef.current = undefined;
-    };
-  }, [children, effectOptions, disableReRenderWarning]);
-
-  return element;
+    return createElement(
+      Component === "Fragment" ? Fragment : Component,
+      finalProps
+    );
+  };
 };
+
+const createReactiveComponent = (Component) => {
+  const Reactive = ({ onTrack, onTrigger, onStop, ...restProps }) => {
+    const effectOptions = useMemo(
+      () => ({
+        scheduler,
+        onTrack,
+        onTrigger,
+        onStop,
+      }),
+      [onTrack, onTrigger, onStop]
+    );
+
+    const effectRef = useRef();
+
+    const [element, setElement] = useState(() => {
+      const render = createRender(Component);
+
+      let _element;
+      effectRef.current = effect(() => {
+        // trigger tracking
+        _element = render(restProps);
+
+        if (effectRef.current) {
+          setElement(_element);
+        }
+      }, effectOptions);
+
+      return _element;
+    });
+
+    useEffect(() => {
+      if (!effectRef.current) {
+        const render = createRender(Component);
+
+        effectRef.current = effect(() => {
+          setElement(render(restProps));
+        }, effectOptions);
+      }
+
+      return () => {
+        stop(effectRef.current);
+        effectRef.current = undefined;
+      };
+    }, [effectOptions]);
+
+    return element;
+  };
+
+  if (Component) {
+    Reactive.displayName =
+      typeof Component === "string"
+        ? `R.${Component}`
+        : Component.displayName || Component.name;
+  }
+
+  return Reactive;
+};
+
+const R = new Proxy(new Map(), {
+  get(target, tagName) {
+    let Component = target.get(tagName);
+    if (!Component) {
+      Component = createReactiveComponent(tagName);
+      target.set(tagName, Component);
+    }
+    return Component;
+  },
+});
 
 const Effect = ({ children }) => {
   useEffect(children, [children]);
@@ -135,8 +171,8 @@ const readonlyRef = (value) => {
 
 export {
   setIsStaticRendering,
-  Reactive,
-  Reactive as R,
+  R,
+  createReactiveComponent,
   Effect,
   useForceMemo,
   useReactiveProps,

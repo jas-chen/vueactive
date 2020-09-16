@@ -87,7 +87,7 @@ const TodoItem = ({
 }) => {
   return useForceMemo(() => {
     const editInput = (
-      <R>
+      <R.Fragment>
         {() =>
           editingTodoId.value === todo.id && (
             <EditTodoInput
@@ -97,44 +97,36 @@ const TodoItem = ({
             />
           )
         }
-      </R>
+      </R.Fragment>
     );
 
     const view = (
       <div className="view">
-        <R>
-          {() => (
-            <input
-              type="checkbox"
-              className="toggle"
-              checked={todo.done}
-              onChange={() => onToggleCompleted(todo)}
-            />
-          )}
-        </R>
-        <label onDoubleClick={() => onStartEditing(todo)}>
-          <R>{() => todo.label}</R>
-        </label>
+        <R.input
+          type="checkbox"
+          className="toggle"
+          checked={() => todo.done}
+          onChange={() => onToggleCompleted(todo)}
+        />
+        <R.label onDoubleClick={() => onStartEditing(todo)}>
+          {() => todo.label}
+        </R.label>
         <button className="destroy" onClick={() => onDestroy(todo)} />
       </div>
     );
 
     return (
-      <R>
-        {() => {
-          return (
-            <li
-              className={[
-                todo.done ? "completed" : "",
-                editingTodoId.value === todo.id ? "editing " : "",
-              ].join(" ")}
-            >
-              {view}
-              {editInput}
-            </li>
-          );
-        }}
-      </R>
+      <R.li
+        className={() =>
+          [
+            todo.done ? "completed" : "",
+            editingTodoId.value === todo.id ? "editing " : "",
+          ].join(" ")
+        }
+      >
+        {view}
+        {editInput}
+      </R.li>
     );
   });
 };
@@ -258,45 +250,34 @@ const App = ({ routeName$ = Router.routeName$ }) => {
             <NewTodoInput onSubmit={addTodo} />
           </header>
           <section className="main">
-            <R>
-              {() => (
-                <input
-                  id="toggle-all"
-                  type="checkbox"
-                  className="toggle-all"
-                  checked={isAllCompleted$.value}
-                  onChange={onToggleAll}
-                />
-              )}
-            </R>
+            <R.input
+              id="toggle-all"
+              type="checkbox"
+              className="toggle-all"
+              checked={isAllCompleted$}
+              onChange={onToggleAll}
+            />
             <label htmlFor="toggle-all" />
-            <ul className="todo-list">
-              <R>{() => filteredTodoList$.value.map(renderTodoItem)}</R>
-            </ul>
+            <R.ul className="todo-list">
+              {() => filteredTodoList$.value.map(renderTodoItem)}
+            </R.ul>
           </section>
 
           <footer className="footer">
             <span className="todo-count">
-              <strong>
-                <R>{itemsLeft$}</R>
-              </strong>{" "}
-              items left
+              <R.strong>{itemsLeft$}</R.strong> items left
             </span>
             <ul className="filters">
               {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
                 <li key={filterKey}>
-                  <R>
-                    {() => (
-                      <a
-                        href={Router.getPath(filterKey)}
-                        className={
-                          routeName$.value === filterKey ? "selected" : ""
-                        }
-                      >
-                        {filterKeyLabelMap[filterKey]}
-                      </a>
+                  <R.a
+                    href={Router.getPath(filterKey)}
+                    className={computed(() =>
+                      routeName$.value === filterKey ? "selected" : ""
                     )}
-                  </R>
+                  >
+                    {filterKeyLabelMap[filterKey]}
+                  </R.a>
                 </li>
               ))}
             </ul>
