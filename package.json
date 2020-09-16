@@ -23,10 +23,7 @@
     "react-dom": ">=16.8"
   },
   "devDependencies": {
-    "@vue/reactivity": "3.0.0-rc.9",
-    "microbundle": "^0.12.3",
-    "react": "16.13.1",
-    "react-dom": "16.13.1"
+    "microbundle": "^0.12.3"
   },
   "bugs": {
     "url": "https://github.com/jas-chen/vueactive/issues"
