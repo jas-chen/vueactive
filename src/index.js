@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useRef,
+  memo,
 } from "react";
 import {
   effect as reactivityEffect,
@@ -109,6 +110,15 @@ const createReactiveComponent = (Component) => {
       ? Component
       : Component.displayName || Component.name
   }`;
+
+  if (process.env.NODE_ENV !== "production") {
+    return memo(ReactiveComponent, (prevProps, nextProps) => {
+      console.warn(
+        `<${ReactiveComponent.displayName}> received new props, however it won't apply theme.`,
+        { prevProps, nextProps }
+      );
+    });
+  }
 
   return ReactiveComponent;
 };
