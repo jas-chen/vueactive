@@ -272,9 +272,9 @@ const App = ({ routeName$ = Router.routeName$ }) => {
                 <li key={filterKey}>
                   <R.a
                     href={Router.getPath(filterKey)}
-                    className={computed(() =>
+                    className={() =>
                       routeName$.value === filterKey ? "selected" : ""
-                    )}
+                    }
                   >
                     {filterKeyLabelMap[filterKey]}
                   </R.a>
