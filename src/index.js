@@ -12,6 +12,7 @@ import {
   stop,
   shallowReactive,
   ref,
+  reactive,
   readonly,
   unref,
 } from "@vue/reactivity";
@@ -163,6 +164,15 @@ const readonlyRef = (value) => {
   return [readonly(value$), setValue];
 };
 
+const readonlyReactive = (actions, initialArg, init) => {
+  const value$ = reactive(init ? init(initialArg) : initialArg);
+  const finalActions = {};
+  for (const [key, action] of Object.entries(actions)) {
+    finalActions[key] = (...args) => action(value$, ...args);
+  }
+  return [readonly(value$), finalActions];
+};
+
 export {
   setIsStaticRendering,
   R,
@@ -171,4 +181,5 @@ export {
   useForceMemo,
   useReactiveProps,
   readonlyRef,
+  readonlyReactive,
 };

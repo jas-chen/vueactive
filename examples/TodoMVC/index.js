@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { ref, reactive, computed, readonly } from "@vue/reactivity";
-import { R, useForceMemo, readonlyRef } from "vueactive";
+import { ref, computed } from "@vue/reactivity";
+import { R, useForceMemo, readonlyRef, readonlyReactive } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -137,52 +137,40 @@ const filterKeyLabelMap = {
   COMPLETED: "Completed",
 };
 
-const createTodoList = () => {
-  const todoList = reactive([]);
-  const addTodo = (label) =>
-    todoList.unshift({
-      id: new Date().getTime(),
-      label: (label || "").trim(),
-      done: false,
-    });
-  const updateTodo = (todo, data) => {
-    Object.assign(
-      todoList.find(({ id }) => id === todo.id),
-      data
-    );
-  };
-  const deleteTodo = (todo) =>
-    todoList.splice(
-      todoList.findIndex(({ id }) => id === todo.id),
-      1
-    );
-  const filterTodo = (fn) => {
-    const leftTodo = todoList.filter(fn);
-    todoList.length = leftTodo.length;
-    leftTodo.forEach((todo, i) => {
-      todoList[i] = todo;
-    });
-  };
-
-  return {
-    todoList: readonly(todoList),
-    addTodo,
-    updateTodo,
-    deleteTodo,
-    filterTodo,
-  };
-};
-
 const App = ({ routeName$ = Router.routeName$ }) => {
-  const {
-    todoList,
-    addTodo,
-    updateTodo,
-    deleteTodo,
-    filterTodo,
-  } = useForceMemo(createTodoList);
-
   return useForceMemo(() => {
+    const [todoList, todoListAction] = readonlyReactive(
+      {
+        addTodo(todoList, label) {
+          todoList.unshift({
+            id: new Date().getTime(),
+            label: (label || "").trim(),
+            done: false,
+          });
+        },
+        updateTodo(todoList, todo, data) {
+          Object.assign(
+            todoList.find(({ id }) => id === todo.id),
+            data
+          );
+        },
+        deleteTodo(todoList, todo) {
+          todoList.splice(
+            todoList.findIndex(({ id }) => id === todo.id),
+            1
+          );
+        },
+        filterTodo(todoList, fn) {
+          const leftTodo = todoList.filter(fn);
+          todoList.length = leftTodo.length;
+          leftTodo.forEach((todo, i) => {
+            todoList[i] = todo;
+          });
+        },
+      },
+      []
+    );
+
     const filteredTodoList$ = computed(() => {
       if (routeName$.value === "ALL") {
         return todoList;
@@ -206,19 +194,20 @@ const App = ({ routeName$ = Router.routeName$ }) => {
     const onToggleAll = () => {
       const done = isAllCompleted$.value ? false : true;
       todoList.forEach((todo) => {
-        updateTodo(todo, { done });
+        todoListAction.updateTodo(todo, { done });
       });
     };
 
     const renderTodoItem = (() => {
       const [editingTodoId$, setEditingTodoId] = readonlyRef(null);
-      const onEditTodo = (todo, label) => updateTodo(todo, { label });
+      const onEditTodo = (todo, label) =>
+        todoListAction.updateTodo(todo, { label });
       const onToggleCompleted = (todo) => {
-        updateTodo(todo, { done: !todo.done });
+        todoListAction.updateTodo(todo, { done: !todo.done });
       };
       const onCancel = () => setEditingTodoId(null);
       const onSubmit = (todo, label) => {
-        updateTodo(todo, { label });
+        todoListAction.updateTodo(todo, { label });
         setEditingTodoId(null);
       };
       const onStartEditing = (todo) => {
@@ -230,7 +219,7 @@ const App = ({ routeName$ = Router.routeName$ }) => {
           key={todo.id}
           todo={todo}
           editingTodoId={editingTodoId$}
-          onDestroy={deleteTodo}
+          onDestroy={todoListAction.deleteTodo}
           onToggleCompleted={onToggleCompleted}
           onStartEditing={onStartEditing}
           onEditTodo={onEditTodo}
@@ -240,14 +229,15 @@ const App = ({ routeName$ = Router.routeName$ }) => {
       );
     })();
 
-    const onClearCompletedClick = () => filterTodo(({ done }) => !done);
+    const onClearCompletedClick = () =>
+      todoListAction.filterTodo(({ done }) => !done);
 
     return (
       <>
         <div className="todoapp">
           <header className="header">
             <h1>todos</h1>
-            <NewTodoInput onSubmit={addTodo} />
+            <NewTodoInput onSubmit={todoListAction.addTodo} />
           </header>
           <section className="main">
             <R.input
