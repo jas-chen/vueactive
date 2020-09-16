@@ -48,13 +48,12 @@ const getLocaleTimeString = () => new Date().toLocaleTimeString();
 const Clock = () => {
   return useForceMemo(() => {
     const time$ = ref(getLocaleTimeString());
-    let intervalId;
 
     return (
       <>
         <Effect>
           {() => {
-            intervalId = setInterval(() => {
+            const intervalId = setInterval(() => {
               time$.value = getLocaleTimeString();
             }, 1000);
 
