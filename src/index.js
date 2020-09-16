@@ -135,10 +135,19 @@ const R = new Proxy(new Map(), {
   },
 });
 
-const Effect = ({ children }) => {
+let Effect = ({ children }) => {
   useEffect(children, [children]);
   return null;
 };
+
+if (process.env.NODE_ENV !== "production") {
+  Effect = memo(Effect, (prevProps, nextProps) => {
+    console.warn(
+      "<Effect> received new props, however it won't apply theme.",
+      { prevProps, nextProps }
+    );
+  });
+}
 
 const emptyArray = [];
 const useForceMemo = (factory) => useMemo(factory, emptyArray);
