@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { ref, computed } from "@vue/reactivity";
 import { R, useForceMemo, readonlyRef, readonlyReactive } from "vueactive";
 
@@ -38,44 +38,6 @@ const Router = createRouter({
   "#/completed": "COMPLETED",
 });
 
-const NewTodoInput = ({ onSubmit }) => {
-  const [label, setLabel] = useState("");
-  return (
-    <input
-      className="new-todo"
-      placeholder="What needs to be done?"
-      value={label}
-      onChange={(e) => setLabel(e.target.value)}
-      onKeyPress={(e) => {
-        if (e.key === "Enter" && label) {
-          onSubmit(label);
-          setLabel("");
-        }
-      }}
-    />
-  );
-};
-
-const EditTodoInput = ({ initLabel, onCancel, onSubmit }) => {
-  const [label, setLabel] = useState(initLabel);
-  return (
-    <input
-      className="edit"
-      value={label}
-      ref={(input) => input && input.focus()}
-      onChange={(e) => setLabel(e.target.value)}
-      onBlur={onCancel}
-      onKeyDown={({ key }) => {
-        if (key === "Enter") {
-          onSubmit(label);
-        } else if (key === "Escape") {
-          onCancel();
-        }
-      }}
-    />
-  );
-};
-
 const TodoItem = ({
   todo,
   editingTodoId,
@@ -90,10 +52,19 @@ const TodoItem = ({
       <R.Fragment>
         {() =>
           editingTodoId.value === todo.id && (
-            <EditTodoInput
-              initLabel={todo.label}
-              onCancel={onCancel}
-              onSubmit={(label) => onSubmit(todo, label)}
+            <R.input
+              className="edit"
+              value={todo.label}
+              ref={(input) => input && input.focus()}
+              onChange={(e) => e.target.value}
+              onBlur={onCancel}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onSubmit(todo, e.target.value);
+                } else if (e.key === "Escape") {
+                  onCancel();
+                }
+              }}
             />
           )
         }
@@ -171,6 +142,8 @@ const App = ({ routeName$ = Router.routeName$ }) => {
       []
     );
 
+    const newTodo$ = ref("");
+
     const filteredTodoList$ = computed(() => {
       if (routeName$.value === "ALL") {
         return todoList;
@@ -237,7 +210,18 @@ const App = ({ routeName$ = Router.routeName$ }) => {
         <div className="todoapp">
           <header className="header">
             <h1>todos</h1>
-            <NewTodoInput onSubmit={todoListAction.addTodo} />
+            <R.input
+              className="new-todo"
+              placeholder="What needs to be done?"
+              value={newTodo$}
+              onChange={(e) => e.target.value}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && e.target.value) {
+                  todoListAction.addTodo(e.target.value);
+                  return "";
+                }
+              }}
+            />
           </header>
           <section className="main">
             <R.input

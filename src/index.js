@@ -6,17 +6,20 @@ import {
   useEffect,
   useRef,
   memo,
+  forwardRef,
 } from "react";
 import {
   effect as reactivityEffect,
   stop,
   shallowReactive,
   ref,
+  isRef,
   reactive,
   readonly,
   unref,
 } from "@vue/reactivity";
 
+const emptyArray = [];
 const dumbEffect = (callback) => callback();
 
 let effect;
@@ -51,7 +54,21 @@ const scheduler = (() => {
   };
 })();
 
-const createRender = (Component) => {
+const createMemoWarning = (name) => (prevProps, nextProps) => {
+  if (
+    Object.keys(prevProps).length !== Object.keys(nextProps).length ||
+    Object.keys(prevProps).some(
+      (key) => !Object.is(prevProps[key], nextProps[key])
+    )
+  ) {
+    console.warn(`${name} received new props, however it won't apply theme.`, {
+      prevProps,
+      nextProps,
+    });
+  }
+};
+
+const createUnrefProps = (Component) => {
   const isBuiltinComponent = typeof Component === "string";
   return (props) => {
     const finalProps = {};
@@ -59,52 +76,63 @@ const createRender = (Component) => {
       if (
         isBuiltinComponent &&
         typeof value === "function" &&
-        !/on[A-Z]/.test(key)
+        !/^on[A-Z]/.test(key)
       ) {
         finalProps[key] = value();
       } else {
         finalProps[key] = unref(value);
       }
     }
-    return createElement(
-      Component === "Fragment" ? Fragment : Component,
-      finalProps
-    );
+    return finalProps;
   };
 };
 
-const createReactiveComponent = (Component) => {
-  const ReactiveComponent = ({ onTrack, onTrigger, onStop, ...restProps }) => {
-    const effectRef = useRef();
+const useTrackProps = (Component, originalProps) => {
+  const effectRef = useRef();
 
-    const [element, setElement] = useState(() => {
-      const render = createRender(Component);
+  const [props, setProps] = useState(() => {
+    const { onTrack, onTrigger, onStop, ...restProps } = originalProps;
+    const unrefProps = createUnrefProps(Component);
 
-      let _element;
-      effectRef.current = effect(
-        () => {
-          // trigger tracking
-          _element = render(restProps);
+    let _props;
+    effectRef.current = effect(
+      () => {
+        // trigger tracking
+        _props = unrefProps(restProps);
 
-          if (effectRef.current) {
-            setElement(_element);
-          }
-        },
-        {
-          scheduler,
-          onTrack,
-          onTrigger,
-          onStop,
+        if (effectRef.current) {
+          setProps(_props);
         }
-      );
+      },
+      {
+        scheduler,
+        onTrack,
+        onTrigger,
+        onStop,
+      }
+    );
 
-      return _element;
-    });
+    return _props;
+  });
 
-    useEffect(() => () => stop(effectRef.current), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => stop(effectRef.current), emptyArray);
 
-    return element;
-  };
+  return props;
+};
+
+const createReactiveComponent = (Component) => {
+  const ReactiveComponent = forwardRef((originalProps, ref) => {
+    const props = useTrackProps(Component, originalProps);
+    return useMemo(
+      () =>
+        createElement(Component === "Fragment" ? Fragment : Component, {
+          ...props,
+          ref,
+        }),
+      [props, ref]
+    );
+  });
 
   ReactiveComponent.displayName = `R.${
     typeof Component === "string"
@@ -113,27 +141,83 @@ const createReactiveComponent = (Component) => {
   }`;
 
   if (process.env.NODE_ENV !== "production") {
-    return memo(ReactiveComponent, (prevProps, nextProps) => {
-      console.warn(
-        `<${ReactiveComponent.displayName}> received new props, however it won't apply theme.`,
-        { prevProps, nextProps }
-      );
-    });
+    return memo(
+      ReactiveComponent,
+      createMemoWarning(`<${ReactiveComponent.displayName}>`)
+    );
   }
 
   return ReactiveComponent;
 };
 
-const R = new Proxy(new Map(), {
-  get(target, tagName) {
-    let Component = target.get(tagName);
-    if (!Component) {
-      Component = createReactiveComponent(tagName);
-      target.set(tagName, Component);
-    }
-    return Component;
-  },
-});
+const without = (object, key) => {
+  const copied = Object.assign({}, object);
+  delete copied[key];
+  return copied;
+};
+
+const createReactiveInput = (tagName) => {
+  const ReactiveInput = forwardRef((originalProps, ref) => {
+    const [value, setValue] = useState(() => unref(originalProps.value));
+    useEffect(() => {
+      if (isRef(originalProps.value)) {
+        originalProps.value.value = value;
+      }
+    }, [value, originalProps.value]);
+    const props = useTrackProps(tagName, without(originalProps, "value"));
+    useEffect(() => {
+      effect(() => {
+        if (isRef(originalProps.value) && originalProps.value.value !== value) {
+          setValue(originalProps.value.value);
+        }
+      });
+    }, [value, originalProps.value]);
+    return useMemo(() => {
+      const finalProps = {};
+      for (const [key, propValue] of Object.entries(props)) {
+        if (typeof propValue === "function") {
+          finalProps[key] = (e) => {
+            const nextValue = propValue(e);
+            if (nextValue !== undefined) {
+              setValue(nextValue);
+            }
+          };
+        } else {
+          finalProps[key] = propValue;
+        }
+      }
+      return createElement(tagName, { ...finalProps, value, ref });
+    }, [props, value, ref]);
+  });
+
+  ReactiveInput.displayName = `R.${tagName}`;
+
+  if (process.env.NODE_ENV !== "production") {
+    return memo(
+      ReactiveInput,
+      createMemoWarning(`<${ReactiveInput.displayName}>`)
+    );
+  }
+
+  return ReactiveInput;
+};
+
+const R = new Proxy(
+  new Map([
+    ["input", createReactiveInput("input")],
+    ["textarea", createReactiveInput("textarea")],
+  ]),
+  {
+    get(target, tagName) {
+      let Component = target.get(tagName);
+      if (!Component) {
+        Component = createReactiveComponent(tagName);
+        target.set(tagName, Component);
+      }
+      return Component;
+    },
+  }
+);
 
 let Effect = ({ children }) => {
   useEffect(children, [children]);
@@ -141,15 +225,9 @@ let Effect = ({ children }) => {
 };
 
 if (process.env.NODE_ENV !== "production") {
-  Effect = memo(Effect, (prevProps, nextProps) => {
-    console.warn(
-      "<Effect> received new props, however it won't apply theme.",
-      { prevProps, nextProps }
-    );
-  });
+  Effect = memo(Effect, createMemoWarning("<Effect>"));
 }
 
-const emptyArray = [];
 const useForceMemo = (factory) => useMemo(factory, emptyArray);
 
 const useReactiveProps = (props) => {
