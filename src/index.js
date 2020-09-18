@@ -91,7 +91,8 @@ const useTrackProps = (Component, originalProps) => {
   const effectRef = useRef();
 
   const [props, setProps] = useState(() => {
-    const { onTrack, onTrigger, onStop, ...restProps } = originalProps;
+    const { onTrack, onTrigger, onStop, ...restProps } =
+      typeof originalProps === "function" ? originalProps() : originalProps;
     const unrefProps = createUnrefProps(Component);
 
     let _props;
@@ -164,7 +165,11 @@ const createReactiveInput = (tagName) => {
         originalProps.value.value = value;
       }
     }, [value, originalProps.value]);
-    const props = useTrackProps(tagName, without(originalProps, "value"));
+    const props = useTrackProps(tagName, () =>
+      isRef(originalProps.value)
+        ? without(originalProps, "value")
+        : originalProps
+    );
     useEffect(() => {
       effect(() => {
         if (isRef(originalProps.value) && originalProps.value.value !== value) {
