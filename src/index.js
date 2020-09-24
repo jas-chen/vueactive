@@ -17,6 +17,7 @@ import {
   reactive,
   readonly,
   unref,
+  computed,
 } from "@vue/reactivity";
 
 const emptyArray = [];
@@ -54,6 +55,32 @@ const scheduler = (() => {
   };
 })();
 
+const useWatch = (ref, options) => {
+  const effectRef = useRef();
+
+  const [value, setValue] = useState(() => {
+    let _value;
+    effectRef.current = effect(
+      () => {
+        // trigger tracking
+        _value = unref(ref);
+
+        if (effectRef.current) {
+          setValue(_value);
+        }
+      },
+      { scheduler, ...options }
+    );
+
+    return _value;
+  });
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => stop(effectRef.current), emptyArray);
+
+  return value;
+};
+
 const createMemoWarning = (name) => (prevProps, nextProps) => {
   if (
     Object.keys(prevProps).length !== Object.keys(nextProps).length ||
@@ -87,39 +114,22 @@ const createUnrefProps = (Component) => {
   };
 };
 
-const useTrackProps = (Component, originalProps) => {
-  const effectRef = useRef();
-
-  const [props, setProps] = useState(() => {
-    const { onTrack, onTrigger, onStop, ...restProps } =
-      typeof originalProps === "function" ? originalProps() : originalProps;
+const useTrackProps = (Component, props) => {
+  const params = useForceMemo(() => {
+    const { onTrack, onTrigger, onStop, ...restProps } = props;
     const unrefProps = createUnrefProps(Component);
 
-    let _props;
-    effectRef.current = effect(
-      () => {
-        // trigger tracking
-        _props = unrefProps(restProps);
-
-        if (effectRef.current) {
-          setProps(_props);
-        }
-      },
+    return [
+      computed(() => unrefProps(restProps)),
       {
-        scheduler,
         onTrack,
         onTrigger,
         onStop,
-      }
-    );
-
-    return _props;
+      },
+    ];
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => () => stop(effectRef.current), emptyArray);
-
-  return props;
+  return useWatch(...params);
 };
 
 const createReactiveComponent = (Component) => {
@@ -138,32 +148,6 @@ const createReactiveComponent = (Component) => {
   return ReactiveComponent;
 };
 
-const useTrackValue = (originalValue) => {
-  const effectRef = useRef();
-
-  const [value, setValue] = useState(() => {
-    let _value;
-    effectRef.current = effect(
-      () => {
-        // trigger tracking
-        _value = unref(originalValue);
-
-        if (effectRef.current) {
-          setValue(_value);
-        }
-      },
-      { scheduler }
-    );
-
-    return _value;
-  });
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => () => stop(effectRef.current), emptyArray);
-
-  return value;
-};
-
 const omit = (object, key) => {
   const copied = Object.assign({}, object);
   delete copied[key];
@@ -172,20 +156,25 @@ const omit = (object, key) => {
 
 const createReactiveInput = (tagName) => {
   const ReactiveInput = forwardRef((originalProps, ref) => {
-    const valueFromProp = useTrackValue(originalProps.value);
+    const valueFromProp = useWatch(originalProps.value);
     const [value, setValue] = useState(valueFromProp);
 
     // state -> prop
     useEffect(() => {
-      if (isRef(originalProps.value) && !Object.is(originalProps.value.value, value)) {
+      if (
+        isRef(originalProps.value) &&
+        !Object.is(originalProps.value.value, value)
+      ) {
         originalProps.value.value = value;
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [value]);
 
-    const props = useTrackProps(tagName, () =>
+    const omittedProps = useForceMemo(() =>
       isRef(originalProps.value) ? omit(originalProps, "value") : originalProps
     );
+
+    const props = useTrackProps(tagName, omittedProps);
 
     return useMemo(() => {
       const finalProps = {};
@@ -287,8 +276,9 @@ const readonlyReactive = (actions, initialArg, init) => {
 
 export {
   setIsStaticRendering,
-  R,
+  useWatch,
   reactify,
+  R,
   Effect,
   useForceMemo,
   useReactiveProps,
