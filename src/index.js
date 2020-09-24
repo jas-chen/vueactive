@@ -177,7 +177,7 @@ const createReactiveInput = (tagName) => {
 
     // state -> prop
     useEffect(() => {
-      if (isRef(originalProps.value) && originalProps.value.value !== value) {
+      if (isRef(originalProps.value) && !Object.is(originalProps.value.value, value)) {
         originalProps.value.value = value;
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -260,7 +260,7 @@ const useReactiveProps = (props) => {
   const keys = new Set([...Object.keys(props), ...Object.keys(props$)]);
 
   for (const key of keys) {
-    if (props$[key] !== props[key]) {
+    if (!Object.is(props$[key], props[key])) {
       props$[key] = props[key];
     }
   }
