@@ -1,6 +1,6 @@
 import React from "react";
-import { ref, computed } from "@vue/reactivity";
-import { R, useForceMemo, readonlyRef, readonlyReactive } from "vueactive";
+import { ref, reactive, computed, unref as _ } from "@vue/reactivity";
+import { useRunOnce, Watch } from "vueactive";
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -38,118 +38,82 @@ const Router = createRouter({
   "#/completed": "COMPLETED",
 });
 
-const TodoItem = ({
-  todo,
-  editingTodoId,
-  onStartEditing,
-  onCancel,
-  onSubmit,
-  onToggleCompleted,
-  onDestroy,
-}) => {
-  return useForceMemo(() => {
-    const editInput = (
-      <R.Fragment>
-        {() =>
-          editingTodoId.value === todo.id && (
-            <R.input
-              className="edit"
-              value={todo.label}
-              ref={(input) => input && input.focus()}
-              onChange={(e) => e.target.value}
-              onBlur={onCancel}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onSubmit(todo, e.target.value);
-                } else if (e.key === "Escape") {
-                  onCancel();
-                }
-              }}
-            />
-          )
-        }
-      </R.Fragment>
-    );
-
-    const view = (
-      <div className="view">
-        <R.input
-          type="checkbox"
-          className="toggle"
-          checked={() => todo.done}
-          onChange={() => onToggleCompleted(todo)}
-        />
-        <R.label onDoubleClick={() => onStartEditing(todo)}>
-          {() => todo.label}
-        </R.label>
-        <button className="destroy" onClick={() => onDestroy(todo)} />
-      </div>
-    );
-
-    return (
-      <R.li
-        className={() =>
-          [
-            todo.done ? "completed" : "",
-            editingTodoId.value === todo.id ? "editing " : "",
-          ].join(" ")
-        }
-      >
-        {view}
-        {editInput}
-      </R.li>
-    );
-  });
-};
-
 const filterKeyLabelMap = {
   ALL: "All",
   ACTIVE: "Active",
   COMPLETED: "Completed",
 };
 
-const App = ({ routeName$ = Router.routeName$ }) => {
-  return useForceMemo(() => {
-    const [todoList, todoListAction] = readonlyReactive(
-      {
-        addTodo(todoList, label) {
-          todoList.unshift({
-            id: new Date().getTime(),
-            label: (label || "").trim(),
-            done: false,
-          });
-        },
-        updateTodo(todoList, todo, data) {
-          Object.assign(
-            todoList.find(({ id }) => id === todo.id),
-            data
-          );
-        },
-        deleteTodo(todoList, todo) {
-          todoList.splice(
-            todoList.findIndex(({ id }) => id === todo.id),
-            1
-          );
-        },
-        filterTodo(todoList, fn) {
-          const leftTodo = todoList.filter(fn);
-          todoList.length = leftTodo.length;
-          leftTodo.forEach((todo, i) => {
-            todoList[i] = todo;
-          });
-        },
-      },
-      []
-    );
+const NewTodoInput = ({ onSubmit }) => {
+  return useRunOnce(() => {
+    const label$ = ref("");
 
-    const newTodo$ = ref("");
+    return (
+      <Watch sync>
+        {() => (
+          <input
+            className="new-todo"
+            placeholder="What needs to be done?"
+            value={_(label$)}
+            onChange={(e) => {
+              label$.value = e.target.value;
+            }}
+            onKeyPress={(e) => {
+              if (e.key === "Enter" && e.target.value) {
+                onSubmit(e.target.value.trim());
+                label$.value = "";
+              }
+            }}
+          />
+        )}
+      </Watch>
+    );
+  });
+};
+
+const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
+  return useRunOnce(() => {
+    const label$ = ref(initLabel);
+
+    return (
+      <Watch sync>
+        {() => (
+          <input
+            className="edit"
+            value={_(label$)}
+            ref={(input) => input && input.focus()}
+            onChange={(e) => {
+              label$.value = e.target.value;
+            }}
+            onBlur={onFinish}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSubmit(e.target.value);
+                onFinish();
+              } else if (e.key === "Escape") {
+                label$.value = "";
+                onFinish();
+              }
+            }}
+          />
+        )}
+      </Watch>
+    );
+  });
+};
+
+const App = ({ routeName$ = Router.routeName$ }) => {
+  return useRunOnce(() => {
+    const todoList = reactive([]);
+    const editingTodoId$ = ref();
 
     const filteredTodoList$ = computed(() => {
-      if (routeName$.value === "ALL") {
+      const routeName = _(routeName$);
+      if (routeName === "ALL") {
         return todoList;
       }
 
-      const filterValue = routeName$.value === "COMPLETED";
+      const filterValue = routeName === "COMPLETED";
       return todoList.filter(({ done }) => done === filterValue);
     });
 
@@ -167,91 +131,139 @@ const App = ({ routeName$ = Router.routeName$ }) => {
     const onToggleAll = () => {
       const done = isAllCompleted$.value ? false : true;
       todoList.forEach((todo) => {
-        todoListAction.updateTodo(todo, { done });
+        todo.done = done;
       });
     };
 
-    const renderTodoItem = (() => {
-      const [editingTodoId$, setEditingTodoId] = readonlyRef(null);
-      const onEditTodo = (todo, label) =>
-        todoListAction.updateTodo(todo, { label });
-      const onToggleCompleted = (todo) => {
-        todoListAction.updateTodo(todo, { done: !todo.done });
-      };
-      const onCancel = () => setEditingTodoId(null);
-      const onSubmit = (todo, label) => {
-        todoListAction.updateTodo(todo, { label });
-        setEditingTodoId(null);
-      };
-      const onStartEditing = (todo) => {
-        setEditingTodoId(todo.id);
-      };
-
-      return (todo) => (
-        <TodoItem
-          key={todo.id}
-          todo={todo}
-          editingTodoId={editingTodoId$}
-          onDestroy={todoListAction.deleteTodo}
-          onToggleCompleted={onToggleCompleted}
-          onStartEditing={onStartEditing}
-          onEditTodo={onEditTodo}
-          onCancel={onCancel}
-          onSubmit={onSubmit}
-        />
-      );
-    })();
-
-    const onClearCompletedClick = () =>
-      todoListAction.filterTodo(({ done }) => !done);
+    const onClearCompletedClick = () => {
+      const notDoneTodoList = todoList.filter(({ done }) => !done);
+      todoList.length = notDoneTodoList.length;
+      notDoneTodoList.forEach((todo, i) => {
+        todoList[i] = todo;
+      });
+    };
 
     return (
       <>
         <div className="todoapp">
           <header className="header">
             <h1>todos</h1>
-            <R.input
-              className="new-todo"
-              placeholder="What needs to be done?"
-              value={newTodo$}
-              onChange={(e) => e.target.value}
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && e.target.value) {
-                  todoListAction.addTodo(e.target.value);
-                  return "";
-                }
-              }}
+            <NewTodoInput
+              onSubmit={(label) =>
+                todoList.unshift({
+                  id: new Date().getTime(),
+                  label,
+                  done: false,
+                })
+              }
             />
           </header>
           <section className="main">
-            <R.input
-              id="toggle-all"
-              type="checkbox"
-              className="toggle-all"
-              checked={isAllCompleted$}
-              onChange={onToggleAll}
-            />
+            <Watch>
+              {() => (
+                <input
+                  id="toggle-all"
+                  type="checkbox"
+                  className="toggle-all"
+                  checked={_(isAllCompleted$)}
+                  onChange={onToggleAll}
+                />
+              )}
+            </Watch>
             <label htmlFor="toggle-all" />
-            <R.ul className="todo-list">
-              {() => filteredTodoList$.value.map(renderTodoItem)}
-            </R.ul>
+            <Watch>
+              {() => (
+                <ul className="todo-list">
+                  {_(filteredTodoList$).map((todo) => (
+                    <Watch key={todo.id}>
+                      {() => (
+                        <li
+                          className={[
+                            todo.done ? "completed" : "",
+                            _(editingTodoId$) === todo.id ? "editing " : "",
+                          ].join(" ")}
+                        >
+                          <div className="view">
+                            <Watch>
+                              {() => (
+                                <input
+                                  type="checkbox"
+                                  className="toggle"
+                                  checked={todo.done}
+                                  onChange={() => {
+                                    todo.done = !todo.done;
+                                  }}
+                                />
+                              )}
+                            </Watch>
+                            <Watch>
+                              {() => (
+                                <label
+                                  onDoubleClick={() => {
+                                    editingTodoId$.value = todo.id;
+                                  }}
+                                >
+                                  {todo.label}
+                                </label>
+                              )}
+                            </Watch>
+                            <button
+                              className="destroy"
+                              onClick={() => {
+                                todoList.splice(
+                                  todoList.findIndex(
+                                    ({ id }) => id === todo.id
+                                  ),
+                                  1
+                                );
+                              }}
+                            />
+                          </div>
+                          <Watch>
+                            {() =>
+                              _(editingTodoId$) === todo.id && (
+                                <EditTodoInput
+                                  initLabel={todo.label}
+                                  onSubmit={(label) => {
+                                    todo.label = label;
+                                  }}
+                                  onFinish={() => {
+                                    editingTodoId$.value = null;
+                                  }}
+                                />
+                              )
+                            }
+                          </Watch>
+                        </li>
+                      )}
+                    </Watch>
+                  ))}
+                </ul>
+              )}
+            </Watch>
           </section>
-
           <footer className="footer">
             <span className="todo-count">
-              <R.strong>{itemsLeft$}</R.strong> items left
+              <strong>
+                <Watch>{itemsLeft$}</Watch>
+              </strong>{" "}
+              items left
             </span>
             <ul className="filters">
               {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
                 <li key={filterKey}>
-                  <R.a
-                    href={Router.getPath(filterKey)}
-                    className={() =>
-                      routeName$.value === filterKey ? "selected" : ""
-                    }
-                  >
-                    {filterKeyLabelMap[filterKey]}
-                  </R.a>
+                  <Watch>
+                    {() => (
+                      <a
+                        href={Router.getPath(filterKey)}
+                        className={
+                          _(routeName$) === filterKey ? "selected" : ""
+                        }
+                      >
+                        {filterKeyLabelMap[filterKey]}
+                      </a>
+                    )}
+                  </Watch>
                 </li>
               ))}
             </ul>

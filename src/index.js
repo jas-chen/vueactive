@@ -1,26 +1,24 @@
 import {
-  Fragment,
-  createElement,
-  useMemo,
   useState,
   useEffect,
   useRef,
-  memo,
-  forwardRef,
+  createElement,
+  useCallback,
+  useMemo,
 } from "react";
 import {
   effect as reactivityEffect,
   stop,
-  shallowReactive,
   ref,
-  isRef,
   reactive,
   readonly,
   unref,
-  computed,
+  pauseTracking,
+  resetTracking,
+  isRef,
 } from "@vue/reactivity";
 
-const emptyArray = [];
+const emptyObject = {};
 const dumbEffect = (callback) => callback();
 
 let effect;
@@ -34,7 +32,7 @@ const isBrowser = typeof window !== "undefined" && globalThis === window;
 
 setIsStaticRendering(!isBrowser);
 
-const scheduler = (() => {
+const nextTickScheduler = (() => {
   let jobs = new Set();
   let isFlushing = false;
   const executeJobs = () => {
@@ -55,217 +53,15 @@ const scheduler = (() => {
   };
 })();
 
-const useWatch = (ref, options) => {
-  const effectRef = useRef();
-
-  const [value, setValue] = useState(() => {
-    let _value;
-    effectRef.current = effect(
-      () => {
-        // trigger tracking
-        _value = unref(ref);
-
-        if (effectRef.current) {
-          setValue(_value);
-        }
-      },
-      { scheduler, ...options }
-    );
-
-    return _value;
-  });
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => () => stop(effectRef.current), emptyArray);
-
-  return value;
-};
-
-const createMemoWarning = (name) => (prevProps, nextProps) => {
-  if (
-    Object.keys(prevProps).length !== Object.keys(nextProps).length ||
-    Object.keys(prevProps).some(
-      (key) => !Object.is(prevProps[key], nextProps[key])
-    )
-  ) {
-    console.warn(`${name} received new props, however it won't apply theme.`, {
-      prevProps,
-      nextProps,
-    });
-  }
-};
-
-const createUnrefProps = (Component) => {
-  const isBuiltinComponent = typeof Component === "string";
-  return (props) => {
-    const finalProps = {};
-    for (const [key, value] of Object.entries(props)) {
-      if (
-        isBuiltinComponent &&
-        typeof value === "function" &&
-        !/^on[A-Z]/.test(key)
-      ) {
-        finalProps[key] = value();
-      } else {
-        finalProps[key] = unref(value);
-      }
-    }
-    return finalProps;
-  };
-};
-
-const useTrackProps = (Component, props) => {
-  const params = useForceMemo(() => {
-    const { onTrack, onTrigger, onStop, ...restProps } = props;
-    const unrefProps = createUnrefProps(Component);
-
-    return [
-      computed(() => unrefProps(restProps)),
-      {
-        onTrack,
-        onTrigger,
-        onStop,
-      },
-    ];
-  });
-
-  return useWatch(...params);
-};
-
-const createReactiveComponent = (Component) => {
-  const ReactiveComponent = forwardRef((originalProps, ref) => {
-    const props = useTrackProps(Component, originalProps);
-    return useMemo(
-      () =>
-        createElement(Component === "Fragment" ? Fragment : Component, {
-          ...props,
-          ref,
-        }),
-      [props, ref]
-    );
-  });
-
-  return ReactiveComponent;
-};
-
-const omit = (object, key) => {
-  const copied = Object.assign({}, object);
-  delete copied[key];
-  return copied;
-};
-
-const createReactiveInput = (tagName) => {
-  const ReactiveInput = forwardRef((originalProps, ref) => {
-    const valueFromProp = useWatch(originalProps.value);
-    const [value, setValue] = useState(valueFromProp);
-
-    // state -> prop
-    useEffect(() => {
-      if (
-        isRef(originalProps.value) &&
-        !Object.is(originalProps.value.value, value)
-      ) {
-        originalProps.value.value = value;
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [value]);
-
-    const omittedProps = useForceMemo(() =>
-      isRef(originalProps.value) ? omit(originalProps, "value") : originalProps
-    );
-
-    const props = useTrackProps(tagName, omittedProps);
-
-    return useMemo(() => {
-      const finalProps = {};
-      for (const [key, propValue] of Object.entries(props)) {
-        if (typeof propValue === "function" && /^on[A-Z]/.test(key)) {
-          finalProps[key] = (e) => {
-            const nextValue = propValue(e);
-            if (nextValue !== undefined) {
-              setValue(nextValue);
-            }
-          };
-        } else {
-          finalProps[key] = propValue;
-        }
-      }
-      return createElement(tagName, { ...finalProps, value, ref });
-    }, [props, value, ref]);
-  });
-
-  return ReactiveInput;
-};
-
-const inputElements = ["input", "textarea"];
-
-const reactify = (Component, options) => {
-  const isInputElement =
-    inputElements.includes(Component) || (options && options.isInputElement);
-  const ReactiveComponent = isInputElement
-    ? createReactiveInput(Component)
-    : createReactiveComponent(Component);
-
-  ReactiveComponent.displayName = `R.${
-    typeof Component === "string"
-      ? Component
-      : Component.displayName || Component.name
-  }`;
-
-  if (process.env.NODE_ENV !== "production") {
-    return memo(
-      ReactiveComponent,
-      createMemoWarning(`<${ReactiveComponent.displayName}>`)
-    );
-  }
-
-  return ReactiveComponent;
-};
-
-const R = new Proxy(new Map(), {
-  get(target, tagName) {
-    let Component = target.get(tagName);
-    if (!Component) {
-      Component = reactify(tagName);
-      target.set(tagName, Component);
-    }
-    return Component;
-  },
-});
-
-let Effect = ({ children }) => {
-  useEffect(children, [children]);
-  return null;
-};
-
-if (process.env.NODE_ENV !== "production") {
-  Effect = memo(Effect, createMemoWarning("<Effect>"));
-}
-
-const useForceMemo = (factory) => useMemo(factory, emptyArray);
-
-const useReactiveProps = (props) => {
-  const props$ = useForceMemo(() => shallowReactive({ ...props }));
-  const keys = new Set([...Object.keys(props), ...Object.keys(props$)]);
-
-  for (const key of keys) {
-    if (!Object.is(props$[key], props[key])) {
-      props$[key] = props[key];
-    }
-  }
-
-  return props$;
-};
-
-const readonlyRef = (value) => {
-  const value$ = ref(value);
+const refModel = (initValue) => {
+  const value$ = ref(initValue);
   const setValue = (newValue) => {
     value$.value = newValue;
   };
   return [readonly(value$), setValue];
 };
 
-const readonlyReactive = (actions, initialArg, init) => {
+const reactiveModel = (actions, initialArg, init) => {
   const value$ = reactive(init ? init(initialArg) : initialArg);
   const finalActions = {};
   for (const [key, action] of Object.entries(actions)) {
@@ -274,14 +70,160 @@ const readonlyReactive = (actions, initialArg, init) => {
   return [readonly(value$), finalActions];
 };
 
+const watch = (fn, options) => {
+  let scheduler;
+  if (options.sync) {
+    scheduler = null;
+  } else {
+    ({ scheduler = nextTickScheduler } = options);
+  }
+
+  return effect(fn, {
+    ...options,
+    scheduler,
+  });
+};
+
+const useWatchEffect = (fn, options = emptyObject) => {
+  const isDone = useRef();
+  const effectRef = useRef();
+
+  if (!isDone.current) {
+    isDone.current = true;
+    effectRef.current = watch(fn, options);
+  }
+
+  useEffect(() => {
+    if (!effectRef.current) {
+      effectRef.current = watch(fn, options);
+    }
+
+    return () => {
+      stop(effectRef.current);
+      effectRef.current = null;
+    };
+  }, [fn, options]);
+};
+
+const useWatch = (ref, options) => {
+  const isDone = useRef();
+  const firstValue = useRef();
+
+  const ef = useCallback(() => {
+    const value = typeof ref === "function" ? ref() : unref(ref);
+    if (!isDone.current) {
+      isDone.current = true;
+      firstValue.current = value;
+    } else {
+      firstValue.current = null;
+      setState(value);
+    }
+  }, [ref]);
+
+  useWatchEffect(ef, options);
+  const [state, setState] = useState(firstValue.current);
+  return state;
+};
+
+const useRunOnce = (factory) => {
+  const isDone = useRef();
+  const result = useRef();
+  if (!isDone.current) {
+    isDone.current = true;
+    pauseTracking();
+    result.current = factory();
+    resetTracking();
+  }
+
+  return result.current;
+};
+
+const Watch = ({
+  children,
+  sync,
+  scheduler,
+  onTrack,
+  onTrigger,
+  onStop,
+  allowRecurse,
+}) => {
+  const options = useMemo(
+    () => ({
+      sync,
+      scheduler,
+      onTrack,
+      onTrigger,
+      onStop,
+      allowRecurse,
+    }),
+    [sync, scheduler, onTrack, onTrigger, onStop, allowRecurse]
+  );
+  return useWatch(children, options);
+};
+
+const useToRef = (value) => {
+  const isDone = useRef();
+  const value$ = useRunOnce(() => {
+    return ref(value);
+  });
+
+  useEffect(() => {
+    if (!isDone.current) {
+      isDone.current = true;
+    } else {
+      value$.value = value;
+    }
+  }, [value$, value]);
+
+  return useRunOnce(() => readonly(value$));
+};
+
+const useReactiveProps = (props) => {
+  const isDone = useRef();
+  const props$ = useRunOnce(() => {
+    // react props is readonly
+    const _props = {};
+    for (const [key, value] of Object.entries(props)) {
+      _props[key] = isRef(value) ? value : ref(value);
+    }
+    return _props;
+  });
+
+  useEffect(() => {
+    if (!isDone.current) {
+      isDone.current = true;
+    } else {
+      for (const [key, value] of Object.entries(props)) {
+        if (!isRef(value)) {
+          props$[key].value = value;
+        }
+      }
+    }
+  }, [props, props$]);
+
+  return props$;
+};
+
+const propsToRefModels = (ReactiveComponent) => {
+  const NewComponent = (props) => {
+    const reactiveProps = useReactiveProps(props);
+    return useRunOnce(() => createElement(ReactiveComponent, reactiveProps));
+  };
+
+  NewComponent.displayName = `PropsToRefModels(${
+    ReactiveComponent.displayName || ReactiveComponent.name
+  })`;
+  return NewComponent;
+};
+
 export {
   setIsStaticRendering,
+  useWatchEffect,
   useWatch,
-  reactify,
-  R,
-  Effect,
-  useForceMemo,
-  useReactiveProps,
-  readonlyRef,
-  readonlyReactive,
+  Watch,
+  useRunOnce,
+  useToRef,
+  propsToRefModels,
+  refModel,
+  reactiveModel,
 };
