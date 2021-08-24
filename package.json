@@ -18,8 +18,8 @@
     "prepublishOnly": "yarn build"
   },
   "peerDependencies": {
-    "@vue/reactivity": "^3.0.0-rc.9",
-    "react": ">=16.8"
+    "@vue/reactivity": "^3.2.4",
+    "react": ">=16.2"
   },
   "devDependencies": {
     "microbundle": "^0.12.3"
