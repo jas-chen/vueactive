@@ -14,54 +14,23 @@ yarn add vueactive
 Counter
 
 ```js
-import React from "react";
+import React, { useState } from "react";
 import { ref } from "@vue/reactivity";
-import { useRunOnce, Watch } from "vueactive";
+import { reactive as $ } from "vueactive";
 
 const Counter = () => {
-  return useRunOnce(() => {
-    const count$ = ref(0);
+  const count$ = useState(() => ref(0))[0];
 
-    return (
-      <>
-        <button onClick={() => count$.value--}>-</button>
-        <Watch>{count$}</Watch>
-        <button onClick={() => count$.value++}>+</button>
-      </>
-    );
-  });
+  return (
+    <>
+      <button onClick={() => count$.value--}>-</button>
+      {$(count$)}
+      <button onClick={() => count$.value++}>+</button>
+    </>
+  );
 };
 
 export default Counter;
-```
-
-
-Clock
-
-```js
-import React, { useEffect } from "react";
-import { ref } from "@vue/reactivity";
-import { useRunOnce, Watch } from "vueactive";
-
-const getLocaleTimeString = () => new Date().toLocaleTimeString();
-
-const Clock = () => {
-  const time$ = useRunOnce(() => ref(getLocaleTimeString()));
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      time$.value = getLocaleTimeString();
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  return useRunOnce(() => (
-    <Watch>{time$}</Watch>
-  ));
-};
-
-export default Clock;
 ```
 
 [TodoMVC](./examples/TodoMVC/index.js)

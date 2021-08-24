@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ref, reactive, computed, unref as _ } from "@vue/reactivity";
-import { reactive as $, component } from "./vueactive";
+import { reactive as $, component } from "vueactive";
 
 const { Input, Ul, Li, Label, A } = component;
 
@@ -225,7 +225,7 @@ const App = ({ routeName$ = Router.routeName$ }) => {
         <footer className="footer">
           <span className="todo-count">
             <strong>
-              {$(() => _(itemsLeft$))}
+              {$(itemsLeft$)}
             </strong>{" "}
             items left
           </span>
