@@ -6,7 +6,7 @@
 ## Installation
 
 ```
-yarn add vueactive
+yarn add vueactive @vue/runtime-core
 ```
 
 ## Examples
@@ -34,12 +34,3 @@ export default Counter;
 ```
 
 [TodoMVC](./examples/TodoMVC/index.js)
-
-
-
-## Compare to MobX
-
-| @vue/reactivity | MobX |
-|---|---|
-| @vue/reactivity [![gzip size](https://img.shields.io/bundlephobia/minzip/@vue/reactivity.svg?style=flat-square)](https://bundlephobia.com/result?p=@vue/reactivity) | mobx [![gzip size](https://img.shields.io/bundlephobia/minzip/mobx.svg?style=flat-square)](https://bundlephobia.com/result?p=mobx) |
-| vueactive [![gzip size](https://img.shields.io/bundlephobia/minzip/vueactive.svg?style=flat-square)](https://bundlephobia.com/result?p=vueactive) | mobx-react [![gzip size](https://img.shields.io/bundlephobia/minzip/mobx-react.svg?style=flat-square)](https://bundlephobia.com/result?p=mobx-react) |

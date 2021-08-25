@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { ref, reactive, computed, unref as _ } from "@vue/reactivity";
-import { reactive as $, component } from "vueactive";
+import { createElement as $, component } from "vueactive";
 
-const { Input, Ul, Li, Label, A } = component;
+const { Input, InputWithRef, Ul, Label, A, Li } = component;
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -50,7 +50,7 @@ const NewTodoInput = ({ onSubmit }) => {
   const label$ = useState(() => ref(""))[0];
 
   return (
-    <Input
+    <InputWithRef
       ref={(element) => element?.focus()}
       className="new-todo"
       placeholder="What needs to be done?"
@@ -75,9 +75,13 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
   const label$ = useState(() => ref(initLabel))[0];
 
   return (
-    <Input
+    <InputWithRef
       className="edit"
-      ref={(input) => input && input.focus()}
+      ref={(input) => {
+        if (input) {
+          requestAnimationFrame(() => input.focus());
+        }
+      }}
       onChange={(e) => {
         label$.value = e.target.value;
       }}
@@ -95,6 +99,68 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
         value: _(label$),
       })}
     />
+  );
+};
+
+const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
+  const className$ = computed(
+    () =>
+      [
+        todo.done ? "completed" : "",
+        _(editingTodoId$) === todo.id ? "editing " : "",
+      ].join(" "),
+    {
+      onTrigger: () => console.log(todo.id),
+    }
+  );
+
+  return (
+    <Li
+      props={() => ({
+        className: _(className$),
+      })}
+      options={{
+        shouldComponentUpdate(...args) {
+          console.log(args);
+          return true;
+        },
+      }}
+    >
+      <div className="view">
+        <Input
+          type="checkbox"
+          className="toggle"
+          onChange={() => {
+            todo.done = !todo.done;
+          }}
+          props={() => ({
+            checked: todo.done,
+          })}
+        />
+        <Label
+          onDoubleClick={() => {
+            editingTodoId$.value = todo.id;
+          }}
+        >
+          {() => todo.label}
+        </Label>
+        <button className="destroy" onClick={onDestroyClick} />
+      </div>
+      {$(
+        () =>
+          _(editingTodoId$) === todo.id && (
+            <EditTodoInput
+              initLabel={todo.label}
+              onSubmit={(label) => {
+                todo.label = label;
+              }}
+              onFinish={() => {
+                editingTodoId$.value = null;
+              }}
+            />
+          )
+      )}
+    </Li>
   );
 };
 
@@ -167,67 +233,24 @@ const App = ({ routeName$ = Router.routeName$ }) => {
           <Ul className="todo-list">
             {() =>
               _(filteredTodoList$).map((todo) => (
-                <Li
+                <TodoItem
                   key={todo.id}
-                  props={() => ({
-                    className: [
-                      todo.done ? "completed" : "",
-                      _(editingTodoId$) === todo.id ? "editing " : "",
-                    ].join(" "),
-                  })}
-                >
-                  <div className="view">
-                    <Input
-                      type="checkbox"
-                      className="toggle"
-                      onChange={() => {
-                        todo.done = !todo.done;
-                      }}
-                      props={() => ({
-                        checked: todo.done,
-                      })}
-                    />
-                    <Label
-                      onDoubleClick={() => {
-                        editingTodoId$.value = todo.id;
-                      }}
-                    >
-                      {() => todo.label}
-                    </Label>
-                    <button
-                      className="destroy"
-                      onClick={() => {
-                        todoList.splice(
-                          todoList.findIndex(({ id }) => id === todo.id),
-                          1
-                        );
-                      }}
-                    />
-                  </div>
-                  {$(() =>
-                    _(editingTodoId$) === todo.id && (
-                      <EditTodoInput
-                        initLabel={todo.label}
-                        onSubmit={(label) => {
-                          todo.label = label;
-                        }}
-                        onFinish={() => {
-                          editingTodoId$.value = null;
-                        }}
-                      />
-                    )
-                  )}
-                </Li>
+                  todo={todo}
+                  editingTodoId$={editingTodoId$}
+                  onDestroyClick={() => {
+                    todoList.splice(
+                      todoList.findIndex(({ id }) => id === todo.id),
+                      1
+                    );
+                  }}
+                />
               ))
             }
           </Ul>
         </section>
         <footer className="footer">
           <span className="todo-count">
-            <strong>
-              {$(itemsLeft$)}
-            </strong>{" "}
-            items left
+            <strong>{$(itemsLeft$)}</strong> items left
           </span>
           <ul className="filters">
             {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (

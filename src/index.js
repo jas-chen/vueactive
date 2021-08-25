@@ -1,27 +1,19 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  memo,
-  createElement,
-  Component,
-  forwardRef,
-  Fragment,
-} from "react";
-import {
-  effect as reactivityEffect,
-  stop,
-  unref,
-} from "@vue/reactivity";
+import React from "react";
+import { unref } from "@vue/reactivity";
+import { watchEffect, watchSyncEffect } from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
 
-let effect;
+let _isStaticRendering = false;
 
 const setIsStaticRendering = (isStaticRendering) => {
-  effect = isStaticRendering ? dumbEffect : reactivityEffect;
+  _isStaticRendering = isStaticRendering;
+};
+
+const getEffect = (sync) => {
+  if (_isStaticRendering) return dumbEffect;
+
+  return sync ? watchSyncEffect : watchEffect;
 };
 
 // eslint-disable-next-line no-undef
@@ -74,13 +66,13 @@ setIsStaticRendering(!isBrowser);
 //   return useWatchValue(render, options);
 // }, justTrue);
 
-class Reactive extends Component {
+class Reactive extends React.Component {
   constructor(props) {
     super(props);
     let done;
     let firstValue;
     this.runEffect = () => {
-      return effect(() => {
+      return getEffect(this.props.options?.sync)(() => {
         const { render } = this.props;
         const value = typeof render === "function" ? render() : unref(render);
         if (!done) {
@@ -91,12 +83,12 @@ class Reactive extends Component {
           this.setState({ element: value });
         }
       }, this.props.options);
-    }
+    };
 
     this.effectRef = this.runEffect();
 
     this.state = {
-      element: firstValue
+      element: firstValue,
     };
   }
   render() {
@@ -108,7 +100,7 @@ class Reactive extends Component {
     }
   }
   componentWillUnmount() {
-    stop(this.effectRef);
+    this.effectRef?.();
     this.effectRef = null;
   }
   shouldComponentUpdate(nextProps, nextState) {
@@ -116,33 +108,81 @@ class Reactive extends Component {
   }
 }
 
-const reactive = (render, options) => {
-  return createElement(Reactive, {
+const createElement = (render, options) => {
+  return React.createElement(Reactive, {
     render,
     options,
   });
-}
+};
+
+const createComponent = (
+  tagName,
+  { sync, withRef } = {
+    sync:
+      typeof tagName === "string" && ["input", "textarea"].includes(tagName),
+    withRef: false,
+  }
+) => {
+  const createCommonProps = (restProps, props) => {
+    return Object.assign(
+      {},
+      restProps,
+      typeof restProps.children === "function" && {
+        children: restProps.children(),
+      },
+      props?.()
+    );
+  };
+
+  if (withRef) {
+    return React.forwardRef(({ props, options, ...restProps }, ref) => {
+      return React.createElement(Reactive, {
+        render() {
+          return React.createElement(
+            tagName,
+            Object.assign(createCommonProps(restProps, props), ref && { ref })
+          );
+        },
+        options: {
+          sync,
+          ...options,
+        },
+      });
+    });
+  }
+
+  return ({ props, options, ...restProps }) => {
+    return React.createElement(Reactive, {
+      render() {
+        return React.createElement(
+          tagName,
+          createCommonProps(restProps, props)
+        );
+      },
+      options: {
+        sync,
+        ...options,
+      },
+    });
+  };
+};
+
+const WITH_REF = "WithRef";
 
 const component = new Proxy(new Map(), {
   get(target, tagName) {
     let Component = target.get(tagName);
     if (!Component) {
-      Component = forwardRef(({ props, ...restProps}, ref) => {
-        return createElement(Reactive, {
-          render() {
-            return createElement(
-              tagName === 'Fragment' ? Fragment : tagName.toLowerCase(),
-              Object.assign(
-                {},
-                restProps,
-                typeof restProps.children === 'function' && { children: restProps.children() },
-                props?.(),
-                ref && { ref },
-              ),
-            )
-          },
-        });
-      });
+      let withRef = false;
+      if (typeof tagName === "string" && tagName.endsWith(WITH_REF)) {
+        withRef = true;
+        tagName = tagName.replace(WITH_REF, "");
+      }
+
+      const finalTagName =
+        tagName === "Fragment" ? Fragment : tagName.toLowerCase();
+
+      Component = createComponent(finalTagName, { withRef });
       Component.displayName = `Reactive.${tagName}`;
       target.set(tagName, Component);
     }
@@ -151,9 +191,10 @@ const component = new Proxy(new Map(), {
 });
 
 export {
-  setIsStaticRendering,
   // useWatchEffect,
+  setIsStaticRendering,
   Reactive,
-  reactive,
+  createElement,
+  createComponent,
   component,
 };
