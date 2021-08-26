@@ -103,21 +103,13 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
 };
 
 const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
-  const className$ = computed(
-    () =>
-      [
-        todo.done ? "completed" : "",
-        _(editingTodoId$) === todo.id ? "editing " : "",
-      ].join(" "),
-    {
-      onTrigger: () => console.log(todo.id),
-    }
-  );
-
   return (
     <Li
       props={() => ({
-        className: _(className$),
+        className: [
+          todo.done ? "completed" : "",
+          _(editingTodoId$) === todo.id ? "editing " : "",
+        ].join(" "),
       })}
       options={{
         shouldComponentUpdate(...args) {

@@ -16,155 +16,107 @@ const getEffect = (sync) => {
   return sync ? watchSyncEffect : watchEffect;
 };
 
-// eslint-disable-next-line no-undef
 const isBrowser = typeof window !== "undefined" && globalThis === window;
 
 setIsStaticRendering(!isBrowser);
 
-// const useWatchEffect = (fn, options) => {
-//   const effectRef = useRef(useState(() => {
-//     return effect(fn, options);
-//   })[0]);
+const createComponent = (tagName, options) => {
+  const sync =
+    options?.sync ?? typeof tagName === "string"
+      ? ["input", "textarea"].includes(tagName)
+      : false;
+  const withRef = options?.withRef;
 
-//   useEffect(() => {
-//     if (!effectRef.current) {
-//       effectRef.current = effect(fn, options);
-//     }
+  class Component extends React.Component {
+    constructor(props) {
+      super(props);
+      let done;
+      let firstChildProps;
+      const { props: props$, options, forwardedRef, ...restProps } = props;
 
-//     return () => {
-//       console.log('unmount')
-//       stop(effectRef.current);
-//       effectRef.current = null;
-//     };
-//   }, []);
-// };
+      this.runEffect = () => {
+        return getEffect(sync)(() => {
+          const reactiveProps =
+            typeof props$ === "function" ? props$() : unref(props$);
+          this.reactivePropsKeys ??=
+            reactiveProps && Object.keys(reactiveProps);
 
-// const useWatchValue = (ref, options) => {
-//   const done = useRef();
-//   const firstValue = useRef();
+          const childrenIsFunction = typeof restProps.children === "function";
+          if (childrenIsFunction) {
+            if (this.reactivePropsKeys) {
+              this.reactivePropsKeys.push("children");
+            } else {
+              this.reactivePropsKeys = ["children"];
+            }
+          }
 
-//   useWatchEffect(() => {
-//     const value = typeof ref === "function" ? ref() : unref(ref);
-//     if (!done.current) {
-//       done.current = true;
-//       firstValue.current = value;
-//     } else {
-//       firstValue.current = null;
-//       setState(value);
-//     }
-//   }, options);
-//   const [state, setState] = useState(firstValue.current);
-//   return state;
-// };
+          const childProps = Object.assign(
+            {},
+            restProps,
+            childrenIsFunction && {
+              children: restProps.children(),
+            },
+            reactiveProps,
+            forwardedRef && { ref: forwardedRef }
+          );
 
-// const justTrue = () => true;
+          if (!done) {
+            done = true;
+            firstChildProps = childProps;
+          } else {
+            firstChildProps = null;
+            this.setState({ childProps });
+          }
+        }, options);
+      };
 
-// const Reactive = memo(({
-//   render,
-//   options,
-// }) => {
-//   return useWatchValue(render, options);
-// }, justTrue);
-
-class Reactive extends React.Component {
-  constructor(props) {
-    super(props);
-    let done;
-    let firstValue;
-    this.runEffect = () => {
-      return getEffect(this.props.options?.sync)(() => {
-        const { render } = this.props;
-        const value = typeof render === "function" ? render() : unref(render);
-        if (!done) {
-          done = true;
-          firstValue = value;
-        } else {
-          firstValue = null;
-          this.setState({ element: value });
-        }
-      }, this.props.options);
-    };
-
-    this.effectRef = this.runEffect();
-
-    this.state = {
-      element: firstValue,
-    };
-  }
-  render() {
-    return this.state.element;
-  }
-  componentDidMount() {
-    if (!this.effectRef) {
       this.effectRef = this.runEffect();
+
+      this.state = {
+        childProps: firstChildProps,
+      };
+    }
+    render() {
+      return React.createElement(tagName, this.state.childProps);
+    }
+    componentDidMount() {
+      this.effectRef ??= this.runEffect();
+    }
+    componentWillUnmount() {
+      this.effectRef?.();
+      this.effectRef = undefined;
+    }
+    shouldComponentUpdate(nextProps, nextState) {
+      return (
+        !!this.reactivePropsKeys &&
+        this.reactivePropsKeys.some(
+          (key) =>
+            !Object.is(nextState.childProps[key], this.state.childProps[key])
+        )
+      );
     }
   }
-  componentWillUnmount() {
-    this.effectRef?.();
-    this.effectRef = null;
-  }
-  shouldComponentUpdate(nextProps, nextState) {
-    return nextState.element !== this.state.element;
-  }
-}
 
-const createElement = (render, options) => {
-  return React.createElement(Reactive, {
-    render,
-    options,
-  });
-};
-
-const createComponent = (
-  tagName,
-  { sync, withRef } = {
-    sync:
-      typeof tagName === "string" && ["input", "textarea"].includes(tagName),
-    withRef: false,
+  if (tagName === React.Fragment) {
+    Component.displayName = `Reactive.Fragment`;
+  } else {
+    Component.displayName = `Reactive.${
+      typeof tagName === "string"
+        ? tagName
+        : tagName.displayName || tagName.name
+    }`;
   }
-) => {
-  const createCommonProps = (restProps, props) => {
-    return Object.assign(
-      {},
-      restProps,
-      typeof restProps.children === "function" && {
-        children: restProps.children(),
-      },
-      props?.()
-    );
-  };
 
   if (withRef) {
-    return React.forwardRef(({ props, options, ...restProps }, ref) => {
-      return React.createElement(Reactive, {
-        render() {
-          return React.createElement(
-            tagName,
-            Object.assign(createCommonProps(restProps, props), ref && { ref })
-          );
-        },
-        options: {
-          sync,
-          ...options,
-        },
+    return React.forwardRef(function ReactiveWithRef(props, ref) {
+      return React.createElement(Component, {
+        ...props,
+        forwardedRef: ref,
       });
     });
   }
 
-  return ({ props, options, ...restProps }) => {
-    return React.createElement(Reactive, {
-      render() {
-        return React.createElement(
-          tagName,
-          createCommonProps(restProps, props)
-        );
-      },
-      options: {
-        sync,
-        ...options,
-      },
-    });
-  };
+  return Component;
 };
 
 const WITH_REF = "WithRef";
@@ -180,21 +132,20 @@ const component = new Proxy(new Map(), {
       }
 
       const finalTagName =
-        tagName === "Fragment" ? Fragment : tagName.toLowerCase();
+        tagName === "Fragment" ? React.Fragment : tagName.toLowerCase();
 
       Component = createComponent(finalTagName, { withRef });
-      Component.displayName = `Reactive.${tagName}`;
       target.set(tagName, Component);
     }
     return Component;
   },
 });
 
-export {
-  // useWatchEffect,
-  setIsStaticRendering,
-  Reactive,
-  createElement,
-  createComponent,
-  component,
+const createElement = (render, options) => {
+  return React.createElement(component.Fragment, {
+    children: () => (typeof render === "function" ? render() : unref(render)),
+    options,
+  });
 };
+
+export { setIsStaticRendering, createElement, createComponent, component };

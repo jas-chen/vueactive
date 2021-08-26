@@ -16,7 +16,7 @@ Counter
 ```js
 import React, { useState } from "react";
 import { ref } from "@vue/reactivity";
-import { reactive as $ } from "vueactive";
+import { createElement as $ } from "vueactive";
 
 const Counter = () => {
   const count$ = useState(() => ref(0))[0];
