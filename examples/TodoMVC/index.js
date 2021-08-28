@@ -108,15 +108,9 @@ const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
       props={() => ({
         className: [
           todo.done ? "completed" : "",
-          _(editingTodoId$) === todo.id ? "editing " : "",
+          _(editingTodoId$) === todo.id ? "editing" : "",
         ].join(" "),
       })}
-      options={{
-        shouldComponentUpdate(...args) {
-          console.log(args);
-          return true;
-        },
-      }}
     >
       <div className="view">
         <Input

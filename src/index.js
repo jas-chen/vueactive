@@ -1,5 +1,5 @@
 import React from "react";
-import { unref } from "@vue/reactivity";
+import { unref, reactive } from "@vue/reactivity";
 import { watchEffect, watchSyncEffect } from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
@@ -30,42 +30,51 @@ const createComponent = (tagName, options) => {
   class Component extends React.Component {
     constructor(props) {
       super(props);
-      let done;
       let firstChildProps;
       const { props: props$, options, forwardedRef, ...restProps } = props;
+      const constantProps = Object.assign(
+        {},
+        restProps,
+        forwardedRef && { ref: forwardedRef }
+      );
+      const props$IsFunction = typeof props$ === "function";
+      const childrenIsFunction = typeof restProps.children === "function";
 
       this.runEffect = () => {
         return getEffect(sync)(() => {
-          const reactiveProps =
-            typeof props$ === "function" ? props$() : unref(props$);
-          this.reactivePropsKeys ??=
-            reactiveProps && Object.keys(reactiveProps);
-
-          const childrenIsFunction = typeof restProps.children === "function";
-          if (childrenIsFunction) {
-            if (this.reactivePropsKeys) {
-              this.reactivePropsKeys.push("children");
-            } else {
-              this.reactivePropsKeys = ["children"];
-            }
-          }
-
-          const childProps = Object.assign(
+          const incomingProps = Object.assign(
             {},
-            restProps,
-            childrenIsFunction && {
-              children: restProps.children(),
-            },
-            reactiveProps,
-            forwardedRef && { ref: forwardedRef }
+            props$IsFunction ? props$() : unref(props$)
           );
 
-          if (!done) {
-            done = true;
-            firstChildProps = childProps;
+          if (childrenIsFunction) {
+            incomingProps.children = restProps.children();
+          }
+
+          const getChildProps = () =>
+            Object.assign({}, constantProps, incomingProps);
+
+          if (!this.state) {
+            firstChildProps = getChildProps();
           } else {
             firstChildProps = null;
-            this.setState({ childProps });
+
+            if (
+              sync ||
+              (incomingProps &&
+                Object.keys(incomingProps).some((key) => {
+                  const nextValue = incomingProps[key];
+
+                  // avoid comparing large string
+                  if (typeof nextValue === "string" && nextValue.length > 120) {
+                    return true;
+                  }
+
+                  return nextValue !== this.state.childProps[key];
+                }))
+            ) {
+              this.setState({ childProps: getChildProps() });
+            }
           }
         }, options);
       };
@@ -87,13 +96,7 @@ const createComponent = (tagName, options) => {
       this.effectRef = undefined;
     }
     shouldComponentUpdate(nextProps, nextState) {
-      return (
-        !!this.reactivePropsKeys &&
-        this.reactivePropsKeys.some(
-          (key) =>
-            !Object.is(nextState.childProps[key], this.state.childProps[key])
-        )
-      );
+      return nextState.childProps !== this.state.childProps;
     }
   }
 
@@ -103,7 +106,7 @@ const createComponent = (tagName, options) => {
     Component.displayName = `Reactive.${
       typeof tagName === "string"
         ? tagName
-        : tagName.displayName || tagName.name
+        : tagName.displayName || tagName.name || "Anonymous"
     }`;
   }
 
@@ -148,4 +151,16 @@ const createElement = (render, options) => {
   });
 };
 
-export { setIsStaticRendering, createElement, createComponent, component };
+const useData = (data) => {
+  return React.useState(() => {
+    return reactive(typeof data === "function" ? data() : data);
+  })[0];
+};
+
+export {
+  setIsStaticRendering,
+  createElement,
+  createComponent,
+  component,
+  useData,
+};
