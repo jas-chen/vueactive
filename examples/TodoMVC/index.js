@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { ref, reactive, computed, unref as _ } from "@vue/reactivity";
-import { createElement as $, component } from "vueactive";
+import React from "react";
+import { ref, toRef, computed, unref as _ } from "@vue/reactivity";
+import { createElement as $, component, forceMemo, useData } from "vueactive";
 
 const { Input, InputWithRef, Ul, Label, A, Li } = component;
 
@@ -46,33 +46,32 @@ const filterKeyLabelMap = {
   COMPLETED: "Completed",
 };
 
-const NewTodoInput = ({ onSubmit }) => {
-  const label$ = useState(() => ref(""))[0];
+const NewTodoInput = forceMemo(({ onSubmit }) => {
+  const data = useData(() => ({ label: "" }));
 
   return (
     <InputWithRef
       ref={(element) => element?.focus()}
       className="new-todo"
       placeholder="What needs to be done?"
-      value={_(label$)}
       onChange={(e) => {
-        label$.value = e.target.value;
+        data.label = e.target.value;
       }}
       onKeyPress={(e) => {
         if (e.key === "Enter" && e.target.value) {
           onSubmit(e.target.value.trim());
-          label$.value = "";
+          data.label = "";
         }
       }}
       props={() => ({
-        value: _(label$),
+        value: data.label,
       })}
     />
   );
-};
+});
 
-const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
-  const label$ = useState(() => ref(initLabel))[0];
+const EditTodoInput = forceMemo(({ initLabel, onSubmit, onFinish }) => {
+  const data = useData(() => ({ label: initLabel }));
 
   return (
     <InputWithRef
@@ -83,7 +82,7 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
         }
       }}
       onChange={(e) => {
-        label$.value = e.target.value;
+        data.label = e.target.value;
       }}
       onBlur={onFinish}
       onKeyDown={(e) => {
@@ -91,18 +90,18 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
           onSubmit(e.target.value);
           onFinish();
         } else if (e.key === "Escape") {
-          label$.value = "";
+          data.label = "";
           onFinish();
         }
       }}
       props={() => ({
-        value: _(label$),
+        value: data.label,
       })}
     />
   );
-};
+});
 
-const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
+const TodoItem = forceMemo(({ todo, editingTodoId$, onDestroyClick }) => {
   return (
     <Li
       props={() => ({
@@ -148,45 +147,46 @@ const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
       )}
     </Li>
   );
-};
+});
 
 const App = ({ routeName$ = Router.routeName$ }) => {
-  const todoList = useState(reactive([]))[0];
-  const editingTodoId$ = useState(() => ref())[0];
+  const data = useData(() => ({
+    todoList: [],
+    editingTodoId: undefined,
+  }));
+
+  const editingTodoId$ = toRef(data, "editingTodoId");
 
   const filteredTodoList$ = computed(() => {
     const routeName = _(routeName$);
     if (routeName === "ALL") {
-      return todoList;
+      return data.todoList;
     }
 
     const filterValue = routeName === "COMPLETED";
-    return todoList.filter(({ done }) => done === filterValue);
+    return data.todoList.filter(({ done }) => done === filterValue);
   });
 
   const itemsLeft$ = computed(() =>
-    todoList.reduce((sum, todo) => (sum += !todo.done ? 1 : 0), 0)
+    data.todoList.reduce((sum, todo) => (sum += todo.done ? 0 : 1), 0)
   );
 
-  const isAllCompleted$ = computed(
-    () =>
-      todoList.length &&
-      todoList.reduce((sum, todo) => sum + (todo.done ? 1 : 0), 0) ===
-        todoList.length
+  const isAllCompleted$ = computed(() =>
+    data.todoList.every((todo) => todo.done)
   );
 
   const onToggleAll = () => {
-    const done = isAllCompleted$.value ? false : true;
-    todoList.forEach((todo) => {
+    const done = !_(isAllCompleted$);
+    data.todoList.forEach((todo) => {
       todo.done = done;
     });
   };
 
   const onClearCompletedClick = () => {
-    const notDoneTodoList = todoList.filter(({ done }) => !done);
-    todoList.length = notDoneTodoList.length;
+    const notDoneTodoList = data.todoList.filter(({ done }) => !done);
+    data.todoList.length = notDoneTodoList.length;
     notDoneTodoList.forEach((todo, i) => {
-      todoList[i] = todo;
+      data.todoList[i] = todo;
     });
   };
 
@@ -197,7 +197,7 @@ const App = ({ routeName$ = Router.routeName$ }) => {
           <h1>todos</h1>
           <NewTodoInput
             onSubmit={(label) =>
-              todoList.unshift({
+              data.todoList.unshift({
                 id: new Date().getTime(),
                 label,
                 done: false,
@@ -224,7 +224,7 @@ const App = ({ routeName$ = Router.routeName$ }) => {
                   todo={todo}
                   editingTodoId$={editingTodoId$}
                   onDestroyClick={() => {
-                    todoList.splice(
+                    data.todoList.splice(
                       todoList.findIndex(({ id }) => id === todo.id),
                       1
                     );

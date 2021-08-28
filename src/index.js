@@ -151,11 +151,16 @@ const createElement = (render, options) => {
   });
 };
 
+const useReadOnlyState = (state) => React.useState(state)[0];
+
 const useData = (data) => {
-  return React.useState(() => {
+  return useReadOnlyState(() => {
     return reactive(typeof data === "function" ? data() : data);
-  })[0];
+  });
 };
+
+const justTrue = () => true;
+const forceMemo = (Component) => React.memo(Component, justTrue);
 
 export {
   setIsStaticRendering,
@@ -163,4 +168,5 @@ export {
   createComponent,
   component,
   useData,
+  forceMemo,
 };
