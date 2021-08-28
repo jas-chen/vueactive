@@ -1,6 +1,6 @@
 import React from "react";
 import { unref, reactive } from "@vue/reactivity";
-import { watchEffect, watchSyncEffect } from "@vue/runtime-core";
+import { computed, watchEffect, watchSyncEffect } from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
 
@@ -153,9 +153,43 @@ const createElement = (render, options) => {
 
 const useReadOnlyState = (state) => React.useState(state)[0];
 
-const useData = (data) => {
+const useReactive = (config) => {
   return useReadOnlyState(() => {
-    return reactive(typeof data === "function" ? data() : data);
+    if (typeof config === "function") {
+      config = config();
+    }
+
+    const data$ = config.data ? reactive(config.data) : undefined;
+    const computed$ = config.computed
+      ? Object.entries(config.computed).reduce((result, [key, fn]) => {
+          result[key] = computed(fn);
+          return result;
+        }, {})
+      : undefined;
+
+    return new Proxy(config, {
+      get({ data }, key) {
+        if (data && data.hasOwnProperty(key)) {
+          return data$[key];
+        }
+
+        return computed$ ? unref(computed$[key]) : undefined;
+      },
+      set(config, key, value) {
+        data$[key] = value;
+        return true;
+      },
+    });
+  });
+};
+
+const useUnRefs = (refs) => {
+  return useReadOnlyState(() => {
+    return new Proxy(Object.assign({}, refs), {
+      get(target, key) {
+        return unref(target[key]);
+      },
+    });
   });
 };
 
@@ -167,6 +201,7 @@ export {
   createElement,
   createComponent,
   component,
-  useData,
+  useReactive,
+  useUnRefs,
   forceMemo,
 };
