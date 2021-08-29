@@ -1,14 +1,8 @@
 import React from "react";
-import { ref, toRef, unref as _ } from "@vue/reactivity";
-import {
-  createElement as $,
-  component,
-  forceMemo,
-  useUnRefs,
-  useReactive,
-} from "vueactive";
+import { ref, toRef, unref as _, computed } from "@vue/runtime-core";
+import { component, useData, useConstant } from "vueactive";
 
-const { Input, Ul, Label, A, Li } = component;
+const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
 
 document.head.insertAdjacentHTML(
   "beforeend",
@@ -52,7 +46,7 @@ const filterKeyLabelMap = {
   COMPLETED: "Completed",
 };
 
-const NewTodoInput = forceMemo(({ onSubmit }) => {
+const NewTodoInput = ({ onSubmit }) => {
   return (
     <input
       ref={(element) => element?.focus()}
@@ -66,9 +60,9 @@ const NewTodoInput = forceMemo(({ onSubmit }) => {
       }}
     />
   );
-});
+};
 
-const EditTodoInput = forceMemo(({ initLabel, onSubmit, onFinish }) => {
+const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
   return (
     <input
       className="edit"
@@ -90,176 +84,171 @@ const EditTodoInput = forceMemo(({ initLabel, onSubmit, onFinish }) => {
       }}
     />
   );
-});
+};
 
-const TodoItem = forceMemo(({ todo, editingTodoId$, onDestroyClick }) => {
-  return (
+const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
+  return useConstant(() => (
     <Li
-      props={() => ({
-        className: [
+      className={computed(() =>
+        [
           todo.done ? "completed" : "",
           _(editingTodoId$) === todo.id ? "editing" : "",
-        ].join(" "),
-      })}
+        ].join(" ")
+      )}
     >
       <div className="view">
         <Input
           type="checkbox"
           className="toggle"
+          checked={computed(() => todo.done)}
           onChange={() => {
             todo.done = !todo.done;
           }}
-          props={() => ({
-            checked: todo.done,
-          })}
         />
         <Label
           onDoubleClick={() => {
             editingTodoId$.value = todo.id;
           }}
         >
-          {() => todo.label}
+          {computed(() => todo.label)}
         </Label>
         <button className="destroy" onClick={onDestroyClick} />
       </div>
-      {$(
-        () =>
-          _(editingTodoId$) === todo.id && (
-            <EditTodoInput
-              initLabel={todo.label}
-              onSubmit={(label) => {
-                todo.label = label;
-              }}
-              onFinish={() => {
-                editingTodoId$.value = null;
-              }}
-            />
-          )
-      )}
+      <Fragment>
+        {computed(
+          () =>
+            _(editingTodoId$) === todo.id && (
+              <EditTodoInput
+                initLabel={todo.label}
+                onSubmit={(label) => {
+                  todo.label = label;
+                }}
+                onFinish={() => {
+                  editingTodoId$.value = null;
+                }}
+              />
+            )
+        )}
+      </Fragment>
     </Li>
-  );
-});
+  ));
+};
 
-const App = (rawProps) => {
-  const props = useUnRefs(rawProps);
-  const vm = useReactive(() => ({
-    data: {
-      todoList: [],
-      editingTodoId: undefined,
-    },
-    computed: {
-      filteredTodoList() {
-        if (props.routeName === "ALL") {
-          return vm.todoList;
-        }
-
-        const filterValue = props.routeName === "COMPLETED";
-        return vm.todoList.filter(({ done }) => done === filterValue);
-      },
-      itemsLeft() {
-        return vm.todoList.reduce((sum, todo) => (sum += todo.done ? 0 : 1), 0);
-      },
-      isAllCompleted() {
-        return vm.todoList.every((todo) => todo.done);
-      },
-    },
+const App = (props) => {
+  const data = useData(() => ({
+    todoList: [],
+    editingTodoId: undefined,
   }));
 
-  const editingTodoId$ = toRef(vm, "editingTodoId");
+  return useConstant(() => {
+    const filteredTodoList = computed(() => {
+      const routeName = _(props.routeName);
+      if (routeName === "ALL") {
+        return data.todoList;
+      }
 
-  const onToggleAll = () => {
-    const done = !_(vm.isAllCompleted);
-    vm.todoList.forEach((todo) => {
-      todo.done = done;
+      const filterValue = routeName === "COMPLETED";
+      return data.todoList.filter(({ done }) => done === filterValue);
     });
-  };
 
-  const onClearCompletedClick = () => {
-    const notDoneTodoList = vm.todoList.filter(({ done }) => !done);
-    vm.todoList.length = notDoneTodoList.length;
-    notDoneTodoList.forEach((todo, i) => {
-      vm.todoList[i] = todo;
+    const itemsLeft = computed(() => {
+      return data.todoList.reduce((sum, todo) => (sum += todo.done ? 0 : 1), 0);
     });
-  };
 
-  return (
-    <>
-      <div className="todoapp">
-        <header className="header">
-          <h1>todos</h1>
-          <NewTodoInput
-            onSubmit={(label) =>
-              vm.todoList.unshift({
-                id: new Date().getTime(),
-                label,
-                done: false,
-              })
-            }
-          />
-        </header>
-        <section className="main">
-          <Input
-            id="toggle-all"
-            type="checkbox"
-            className="toggle-all"
-            onChange={onToggleAll}
-            props={() => ({
-              checked: vm.isAllCompleted,
-            })}
-          />
-          <label htmlFor="toggle-all" />
-          <Ul className="todo-list">
-            {() =>
-              vm.filteredTodoList.map((todo) => (
-                <TodoItem
-                  key={todo.id}
-                  todo={todo}
-                  editingTodoId$={editingTodoId$}
-                  onDestroyClick={() => {
-                    vm.todoList.splice(
-                      vm.todoList.findIndex(({ id }) => id === todo.id),
-                      1
-                    );
-                  }}
-                />
-              ))
-            }
-          </Ul>
-        </section>
-        <footer className="footer">
-          <span className="todo-count">
-            <strong>{$(() => vm.itemsLeft)}</strong> items left
-          </span>
-          <ul className="filters">
-            {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
-              <li key={filterKey}>
-                <A
-                  href={Router.getPath(filterKey)}
-                  props={() => ({
-                    className: props.routeName === filterKey ? "selected" : "",
-                  })}
-                >
-                  {filterKeyLabelMap[filterKey]}
-                </A>
-              </li>
-            ))}
-          </ul>
-          <button className="clear-completed" onClick={onClearCompletedClick}>
-            Clear completed
-          </button>
+    const isAllCompleted = computed(() => {
+      return data.todoList.length && data.todoList.every((todo) => todo.done);
+    });
+
+    const editingTodoId$ = toRef(data, "editingTodoId");
+
+    const onToggleAll = () => {
+      const done = !_(isAllCompleted);
+      data.todoList.forEach((todo) => {
+        todo.done = done;
+      });
+    };
+
+    const onClearCompletedClick = () => {
+      data.todoList = data.todoList.filter(({ done }) => !done);
+    };
+
+    return (
+      <>
+        <div className="todoapp">
+          <header className="header">
+            <h1>todos</h1>
+            <NewTodoInput
+              onSubmit={(label) =>
+                data.todoList.unshift({
+                  id: new Date().getTime(),
+                  label,
+                  done: false,
+                })
+              }
+            />
+          </header>
+          <section className="main">
+            <Input
+              id="toggle-all"
+              type="checkbox"
+              className="toggle-all"
+              checked={isAllCompleted}
+              onChange={onToggleAll}
+            />
+            <label htmlFor="toggle-all" />
+            <Ul className="todo-list">
+              {computed(() =>
+                _(filteredTodoList).map((todo) => (
+                  <TodoItem
+                    key={todo.id}
+                    todo={todo}
+                    editingTodoId$={editingTodoId$}
+                    onDestroyClick={() => {
+                      data.todoList.splice(
+                        data.todoList.findIndex(({ id }) => id === todo.id),
+                        1
+                      );
+                    }}
+                  />
+                ))
+              )}
+            </Ul>
+          </section>
+          <footer className="footer">
+            <span className="todo-count">
+              <Strong>{itemsLeft}</Strong> items left
+            </span>
+            <ul className="filters">
+              {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
+                <li key={filterKey}>
+                  <A
+                    href={Router.getPath(filterKey)}
+                    className={computed(() =>
+                      _(props.routeName) === filterKey ? "selected" : ""
+                    )}
+                  >
+                    {filterKeyLabelMap[filterKey]}
+                  </A>
+                </li>
+              ))}
+            </ul>
+            <button className="clear-completed" onClick={onClearCompletedClick}>
+              Clear completed
+            </button>
+          </footer>
+        </div>
+        <footer className="info">
+          <p>Double-click to edit a todo</p>
+          <p>
+            Created by <a href="http://github.com/jas-chen/">Jas Chen</a>
+          </p>
+          <p>
+            Part of <a href="http://todomvc.com">TodoMVC</a>
+          </p>
         </footer>
-      </div>
-      <footer className="info">
-        <p>Double-click to edit a todo</p>
-        <p>
-          Created by <a href="http://github.com/jas-chen/">Jas Chen</a>
-        </p>
-        <p>
-          Part of <a href="http://todomvc.com">TodoMVC</a>
-        </p>
-      </footer>
-    </>
-  );
+      </>
+    );
+  });
 };
 
 App.defaultProps = {

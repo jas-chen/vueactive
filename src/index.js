@@ -1,6 +1,12 @@
-import React from "react";
-import { unref, reactive } from "@vue/reactivity";
-import { computed, watchEffect, watchSyncEffect } from "@vue/runtime-core";
+import React, { useEffect } from "react";
+import { pauseTracking, resetTracking } from "@vue/reactivity";
+import {
+  unref,
+  reactive,
+  watchEffect,
+  watchSyncEffect,
+  isRef,
+} from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
 
@@ -20,83 +26,48 @@ const isBrowser = typeof window !== "undefined" && globalThis === window;
 
 setIsStaticRendering(!isBrowser);
 
-const createComponent = (tagName, options) => {
+const reactify = (tagName, options) => {
   const sync =
     options?.sync ?? typeof tagName === "string"
       ? ["input", "textarea"].includes(tagName)
       : false;
+
   const withRef = options?.withRef;
 
   class Component extends React.Component {
     constructor(props) {
       super(props);
-      let firstChildProps;
-      const { props: props$, options, forwardedRef, ...restProps } = props;
-      const constantProps = Object.assign(
-        {},
-        restProps,
-        forwardedRef && { ref: forwardedRef }
-      );
-      const props$IsFunction = typeof props$ === "function";
-      const childrenIsFunction = typeof restProps.children === "function";
+      const { $$options, forwardedRef, ...restProps } = props;
 
-      this.runEffect = () => {
-        return getEffect(sync)(() => {
-          const incomingProps = Object.assign(
-            {},
-            props$IsFunction ? props$() : unref(props$)
-          );
-
-          if (childrenIsFunction) {
-            incomingProps.children = restProps.children();
-          }
-
-          const getChildProps = () =>
-            Object.assign({}, constantProps, incomingProps);
-
-          if (!this.state) {
-            firstChildProps = getChildProps();
-          } else {
-            firstChildProps = null;
-
-            if (
-              sync ||
-              (incomingProps &&
-                Object.keys(incomingProps).some((key) => {
-                  const nextValue = incomingProps[key];
-
-                  // avoid comparing large string
-                  if (typeof nextValue === "string" && nextValue.length > 120) {
-                    return true;
-                  }
-
-                  return nextValue !== this.state.childProps[key];
-                }))
-            ) {
-              this.setState({ childProps: getChildProps() });
+      this.stopEffect = getEffect(sync)(() => {
+        const childProps = Object.entries(restProps).reduce(
+          (result, [key, value]) => {
+            if (isRef(value)) {
+              this.hasReactiveProp = true;
             }
-          }
-        }, options);
-      };
+            result[key] = unref(value);
+            return result;
+          },
+          forwardedRef ? { ref: forwardedRef } : {}
+        );
 
-      this.effectRef = this.runEffect();
+        const element = React.createElement(tagName, childProps);
 
-      this.state = {
-        childProps: firstChildProps,
-      };
+        if (!this.state) {
+          this.state = { element };
+        } else {
+          this.setState(() => ({ element }));
+        }
+      }, $$options);
     }
     render() {
-      return React.createElement(tagName, this.state.childProps);
-    }
-    componentDidMount() {
-      this.effectRef ??= this.runEffect();
+      return this.state.element;
     }
     componentWillUnmount() {
-      this.effectRef?.();
-      this.effectRef = undefined;
+      this.stopEffect();
     }
     shouldComponentUpdate(nextProps, nextState) {
-      return nextState.childProps !== this.state.childProps;
+      return !this.hasReactiveProp || nextState.element !== this.state.element;
     }
   }
 
@@ -119,7 +90,7 @@ const createComponent = (tagName, options) => {
     });
   }
 
-  return Component;
+  return React.memo(Component);
 };
 
 const WITH_REF = "WithRef";
@@ -137,71 +108,22 @@ const component = new Proxy(new Map(), {
       const finalTagName =
         tagName === "Fragment" ? React.Fragment : tagName.toLowerCase();
 
-      Component = createComponent(finalTagName, { withRef });
+      Component = reactify(finalTagName, { withRef });
       target.set(tagName, Component);
     }
     return Component;
   },
 });
 
-const createElement = (render, options) => {
-  return React.createElement(component.Fragment, {
-    children: () => (typeof render === "function" ? render() : unref(render)),
-    options,
+const useConstant = (state) => React.useState(state)[0];
+
+const useData = (data) => {
+  return useConstant(() => {
+    pauseTracking();
+    const value = data();
+    resetTracking();
+    return reactive(value);
   });
 };
 
-const useReadOnlyState = (state) => React.useState(state)[0];
-
-const useReactive = (config) => {
-  return useReadOnlyState(() => {
-    if (typeof config === "function") {
-      config = config();
-    }
-
-    const data$ = config.data ? reactive(config.data) : undefined;
-    const computed$ = config.computed
-      ? Object.entries(config.computed).reduce((result, [key, fn]) => {
-          result[key] = computed(fn);
-          return result;
-        }, {})
-      : undefined;
-
-    return new Proxy(config, {
-      get({ data }, key) {
-        if (data && data.hasOwnProperty(key)) {
-          return data$[key];
-        }
-
-        return computed$ ? unref(computed$[key]) : undefined;
-      },
-      set(config, key, value) {
-        data$[key] = value;
-        return true;
-      },
-    });
-  });
-};
-
-const useUnRefs = (refs) => {
-  return useReadOnlyState(() => {
-    return new Proxy(Object.assign({}, refs), {
-      get(target, key) {
-        return unref(target[key]);
-      },
-    });
-  });
-};
-
-const justTrue = () => true;
-const forceMemo = (Component) => React.memo(Component, justTrue);
-
-export {
-  setIsStaticRendering,
-  createElement,
-  createComponent,
-  component,
-  useReactive,
-  useUnRefs,
-  forceMemo,
-};
+export { setIsStaticRendering, reactify, component, useConstant, useData };
