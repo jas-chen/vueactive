@@ -174,6 +174,81 @@ const renderList = (data, key, render) =>
     render,
   });
 
+const mapValues = (data, mapper) =>
+  Object.entries(data).reduce((result, [key, value]) => {
+    result[key] = mapper(value);
+    return result;
+  }, {});
+
+const setup = ({ props, data = {}, computed: computedConfig, methods }) => {
+  props = { ...props };
+  const innerObject = new Proxy(
+    {},
+    {
+      get(target, key) {
+        for (const obj of [props, data$, computed$]) {
+          if (obj && obj.hasOwnProperty(key)) {
+            return unref(obj[key]);
+          }
+        }
+
+        if (methods$.hasOwnProperty(key)) {
+          return methods$[key];
+        }
+      },
+      set(target, key, value) {
+        data$[key] = value;
+        return true;
+      },
+    }
+  );
+
+  if (typeof data === "function") {
+    data = data.call(innerObject);
+  }
+
+  const data$ = data && reactive(data);
+  const computed$ =
+    computedConfig &&
+    mapValues(computedConfig, (fn) => {
+      return computed(fn.bind(innerObject));
+    });
+  const methods$ =
+    methods &&
+    mapValues(methods, (fn) => {
+      return function () {
+        pauseTracking();
+        try {
+          const result = fn.apply(innerObject, arguments);
+          resetTracking();
+          return result;
+        } catch (e) {
+          resetTracking();
+          throw e;
+        }
+      };
+    });
+
+  const seq = [props, data$, computed$, methods$].filter(Boolean);
+
+  return new Proxy(
+    {},
+    {
+      get(target, key) {
+        for (const obj of seq) {
+          if (obj.hasOwnProperty(key)) {
+            return obj[key];
+          }
+        }
+      },
+      set(target, key, value) {
+        data$[key] = value;
+        return true;
+      },
+    }
+  );
+};
+
 export {
   setIsStaticRendering,
   reactify,
@@ -181,4 +256,5 @@ export {
   useConstant,
   useData,
   renderList,
+  setup,
 };

@@ -1,6 +1,6 @@
 import React from "react";
-import { ref, toRef, unref as _, computed } from "@vue/runtime-core";
-import { component, useData, useConstant, renderList } from "vueactive";
+import { ref, toRef, computed } from "@vue/runtime-core";
+import { component, useConstant, renderList, setup } from "vueactive";
 
 const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
 
@@ -78,7 +78,7 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
           onSubmit(e.target.value);
           onFinish();
         } else if (e.key === "Escape") {
-          data.label = "";
+          vm.label = "";
           onFinish();
         }
       }}
@@ -86,91 +86,117 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
   );
 };
 
-const TodoItem = ({ todo, editingTodoId$, onDestroyClick }) => {
-  return useConstant(() => (
-    <Li
-      className={computed(() =>
-        [
-          todo.done ? "completed" : "",
-          _(editingTodoId$) === todo.id ? "editing" : "",
-        ].join(" ")
-      )}
-    >
-      <div className="view">
-        <Input
-          type="checkbox"
-          className="toggle"
-          checked={computed(() => todo.done)}
-          onChange={() => {
-            todo.done = !todo.done;
-          }}
-        />
-        <Label
-          onDoubleClick={() => {
-            editingTodoId$.value = todo.id;
-          }}
-        >
-          {computed(() => todo.label)}
-        </Label>
-        <button className="destroy" onClick={onDestroyClick} />
-      </div>
-      <Fragment>
-        {computed(
-          () =>
-            _(editingTodoId$) === todo.id && (
+const TodoItem = (props) => {
+  return useConstant(() => {
+    const vm = setup({
+      props,
+      computed: {
+        listClassName() {
+          return [
+            this.todo.done ? "completed" : "",
+            this.editingTodoId === this.todo.id ? "editing" : "",
+          ].join(" ");
+        },
+        editTodo() {
+          return (
+            props.editingTodoId.value === this.todo.id && (
               <EditTodoInput
-                initLabel={todo.label}
+                initLabel={this.todo.label}
                 onSubmit={(label) => {
-                  todo.label = label;
+                  this.todo.label = label;
                 }}
                 onFinish={() => {
-                  editingTodoId$.value = null;
+                  props.editingTodoId.value = null;
                 }}
               />
             )
-        )}
-      </Fragment>
-    </Li>
-  ));
+          );
+        },
+        label() {
+          return this.todo.label;
+        },
+        checked() {
+          return this.todo.done;
+        },
+      },
+    });
+
+    return (
+      <Li className={vm.listClassName}>
+        <div className="view">
+          <Input
+            type="checkbox"
+            className="toggle"
+            checked={vm.checked}
+            onChange={() => {
+              vm.todo.done = !vm.todo.done;
+            }}
+          />
+          <Label
+            onDoubleClick={() => {
+              props.editingTodoId.value = props.todo.id;
+            }}
+          >
+            {vm.label}
+          </Label>
+          <button className="destroy" onClick={props.onDestroyClick} />
+        </div>
+        <Fragment>{vm.editTodo}</Fragment>
+      </Li>
+    );
+  });
 };
 
 const App = (props) => {
-  const data = useData(() => ({
-    todoList: [],
-    editingTodoId: undefined,
-  }));
-
   return useConstant(() => {
-    const filteredTodoList = computed(() => {
-      const routeName = _(props.routeName);
-      if (routeName === "ALL") {
-        return data.todoList;
-      }
+    const vm = setup({
+      props: {
+        routeName: props.routeName,
+      },
+      data: {
+        todoList: [],
+        editingTodoId: undefined,
+      },
+      computed: {
+        filteredTodoList() {
+          if (this.routeName === "ALL") {
+            return this.todoList;
+          }
 
-      const filterValue = routeName === "COMPLETED";
-      return data.todoList.filter(({ done }) => done === filterValue);
+          const filterValue = this.routeName === "COMPLETED";
+          return this.todoList.filter(({ done }) => done === filterValue);
+        },
+        itemsLeft() {
+          return this.todoList.reduce(
+            (sum, todo) => (sum += todo.done ? 0 : 1),
+            0
+          );
+        },
+        isAllCompleted() {
+          return (
+            this.todoList.length > 0 && this.todoList.every((todo) => todo.done)
+          );
+        },
+      },
+      methods: {
+        onToggleAll() {
+          const done = !this.isAllCompleted;
+          this.todoList.forEach((todo) => {
+            todo.done = done;
+          });
+        },
+        onClearCompletedClick() {
+          this.todoList = this.todoList.filter(({ done }) => !done);
+        },
+        filterClassName(filterKey) {
+          return computed(() =>
+            this.routeName === filterKey ? "selected" : ""
+          );
+        },
+      },
     });
 
-    const itemsLeft = computed(() => {
-      return data.todoList.reduce((sum, todo) => (sum += todo.done ? 0 : 1), 0);
-    });
-
-    const isAllCompleted = computed(() => {
-      return data.todoList.length && data.todoList.every((todo) => todo.done);
-    });
-
-    const editingTodoId$ = toRef(data, "editingTodoId");
-
-    const onToggleAll = () => {
-      const done = !_(isAllCompleted);
-      data.todoList.forEach((todo) => {
-        todo.done = done;
-      });
-    };
-
-    const onClearCompletedClick = () => {
-      data.todoList = data.todoList.filter(({ done }) => !done);
-    };
+    const editingTodoId = toRef(vm, "editingTodoId");
 
     return (
       <>
@@ -179,7 +205,7 @@ const App = (props) => {
             <h1>todos</h1>
             <NewTodoInput
               onSubmit={(label) =>
-                data.todoList.unshift({
+                vm.todoList.unshift({
                   id: new Date().getTime(),
                   label,
                   done: false,
@@ -192,18 +218,18 @@ const App = (props) => {
               id="toggle-all"
               type="checkbox"
               className="toggle-all"
-              checked={isAllCompleted}
-              onChange={onToggleAll}
+              checked={vm.isAllCompleted}
+              onChange={vm.onToggleAll}
             />
             <label htmlFor="toggle-all" />
             <Ul className="todo-list">
-              {renderList(filteredTodoList, "id", (todo) => (
+              {renderList(vm.filteredTodoList, "id", (todo) => (
                 <TodoItem
                   todo={todo}
-                  editingTodoId$={editingTodoId$}
+                  editingTodoId={editingTodoId}
                   onDestroyClick={() => {
-                    data.todoList.splice(
-                      data.todoList.findIndex(({ id }) => id === todo.id),
+                    vm.todoList.splice(
+                      vm.todoList.findIndex(({ id }) => id === todo.id),
                       1
                     );
                   }}
@@ -213,23 +239,24 @@ const App = (props) => {
           </section>
           <footer className="footer">
             <span className="todo-count">
-              <Strong>{itemsLeft}</Strong> items left
+              <Strong>{vm.itemsLeft}</Strong> items left
             </span>
             <ul className="filters">
               {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
                 <li key={filterKey}>
                   <A
                     href={Router.getPath(filterKey)}
-                    className={computed(() =>
-                      _(props.routeName) === filterKey ? "selected" : ""
-                    )}
+                    className={vm.filterClassName(filterKey)}
                   >
                     {filterKeyLabelMap[filterKey]}
                   </A>
                 </li>
               ))}
             </ul>
-            <button className="clear-completed" onClick={onClearCompletedClick}>
+            <button
+              className="clear-completed"
+              onClick={vm.onClearCompletedClick}
+            >
               Clear completed
             </button>
           </footer>
