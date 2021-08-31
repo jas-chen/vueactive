@@ -1,6 +1,6 @@
 import React from "react";
 import { ref, toRef, unref as _, computed } from "@vue/runtime-core";
-import { component, useData, useConstant } from "vueactive";
+import { component, useData, useConstant, renderList } from "vueactive";
 
 const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
 
@@ -197,21 +197,18 @@ const App = (props) => {
             />
             <label htmlFor="toggle-all" />
             <Ul className="todo-list">
-              {computed(() =>
-                _(filteredTodoList).map((todo) => (
-                  <TodoItem
-                    key={todo.id}
-                    todo={todo}
-                    editingTodoId$={editingTodoId$}
-                    onDestroyClick={() => {
-                      data.todoList.splice(
-                        data.todoList.findIndex(({ id }) => id === todo.id),
-                        1
-                      );
-                    }}
-                  />
-                ))
-              )}
+              {renderList(filteredTodoList, "id", (todo) => (
+                <TodoItem
+                  todo={todo}
+                  editingTodoId$={editingTodoId$}
+                  onDestroyClick={() => {
+                    data.todoList.splice(
+                      data.todoList.findIndex(({ id }) => id === todo.id),
+                      1
+                    );
+                  }}
+                />
+              ))}
             </Ul>
           </section>
           <footer className="footer">

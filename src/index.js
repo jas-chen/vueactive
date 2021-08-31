@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { pauseTracking, resetTracking } from "@vue/reactivity";
 import {
   unref,
@@ -6,6 +6,7 @@ import {
   watchEffect,
   watchSyncEffect,
   isRef,
+  computed,
 } from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
@@ -44,8 +45,11 @@ const reactify = (tagName, options) => {
           (result, [key, value]) => {
             if (isRef(value)) {
               this.hasReactiveProp = true;
+              result[key] = unref(value);
+            } else {
+              result[key] = value;
             }
-            result[key] = unref(value);
+
             return result;
           },
           forwardedRef ? { ref: forwardedRef } : {}
@@ -126,4 +130,55 @@ const useData = (data) => {
   });
 };
 
-export { setIsStaticRendering, reactify, component, useConstant, useData };
+const List = ({ data, getKey, render }) => {
+  return useConstant(() => {
+    const cache = {};
+    const keyIsFunction = typeof getKey === "function";
+    const newCache = {};
+
+    const list$ = computed(() => {
+      const result = unref(data).map((item) => {
+        const cacheKey = keyIsFunction ? getKey(item) : item[getKey];
+        const element =
+          cache[cacheKey] ||
+          React.createElement(React.Fragment, {
+            key: cacheKey,
+            children: render(item),
+          });
+
+        cache[cacheKey] = element;
+        newCache[cacheKey] = true;
+
+        return element;
+      });
+
+      Object.keys(cache).forEach((cacheKey) => {
+        if (!newCache.hasOwnProperty(cacheKey)) {
+          delete cache[cacheKey];
+        }
+      });
+
+      return result;
+    });
+
+    return React.createElement(component.Fragment, {
+      children: list$,
+    });
+  });
+};
+
+const renderList = (data, key, render) =>
+  React.createElement(List, {
+    data,
+    getKey: key,
+    render,
+  });
+
+export {
+  setIsStaticRendering,
+  reactify,
+  component,
+  useConstant,
+  useData,
+  renderList,
+};
