@@ -121,15 +121,6 @@ const component = new Proxy(new Map(), {
 
 const useConstant = (state) => React.useState(state)[0];
 
-const useData = (data) => {
-  return useConstant(() => {
-    pauseTracking();
-    const value = data();
-    resetTracking();
-    return reactive(value);
-  });
-};
-
 const List = ({ data, getKey, render }) => {
   return useConstant(() => {
     const cache = {};
@@ -204,7 +195,9 @@ const setup = ({ props, data = {}, computed: computedConfig, methods }) => {
   );
 
   if (typeof data === "function") {
+    pauseTracking();
     data = data.call(innerObject);
+    resetTracking();
   }
 
   const data$ = data && reactive(data);
@@ -254,7 +247,6 @@ export {
   reactify,
   component,
   useConstant,
-  useData,
   renderList,
   setup,
 };
