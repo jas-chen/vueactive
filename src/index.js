@@ -2,7 +2,6 @@ import React from "react";
 import { pauseTracking, resetTracking } from "@vue/reactivity";
 import {
   unref,
-  reactive,
   watchEffect,
   watchSyncEffect,
   isRef,
