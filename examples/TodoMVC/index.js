@@ -1,6 +1,12 @@
 import React from "react";
-import { ref, toRef, computed } from "@vue/runtime-core";
-import { component, useConstant, renderList, setup } from "vueactive";
+import { reactive, ref } from "@vue/runtime-core";
+import {
+  component,
+  useConstant,
+  renderList,
+  setup,
+  computed,
+} from "vueactive";
 
 const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
 
@@ -89,34 +95,19 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
 const TodoItem = (props) => {
   return useConstant(() => {
     const vm = setup({
-      props,
+      refs: props,
       computed: {
         listClassName() {
           return [
-            this.todo.done ? "completed" : "",
-            this.editingTodoId === this.todo.id ? "editing" : "",
+            vm.todo.done ? "completed" : "",
+            vm.editingTodoId === vm.todo.id ? "editing" : "",
           ].join(" ");
         },
-        editTodo() {
-          return (
-            props.editingTodoId.value === this.todo.id && (
-              <EditTodoInput
-                initLabel={this.todo.label}
-                onSubmit={(label) => {
-                  this.todo.label = label;
-                }}
-                onFinish={() => {
-                  props.editingTodoId.value = null;
-                }}
-              />
-            )
-          );
-        },
         label() {
-          return this.todo.label;
+          return vm.todo.label;
         },
         checked() {
-          return this.todo.done;
+          return vm.todo.done;
         },
       },
     });
@@ -134,69 +125,102 @@ const TodoItem = (props) => {
           />
           <Label
             onDoubleClick={() => {
-              props.editingTodoId.value = props.todo.id;
+              props.editingTodoId.value = vm.todo.id;
             }}
           >
             {vm.label}
           </Label>
-          <button className="destroy" onClick={props.onDestroyClick} />
+          <button className="destroy" onClick={vm.onDestroyClick} />
         </div>
-        <Fragment>{vm.editTodo}</Fragment>
+        <Fragment>
+          {computed(
+            () =>
+              vm.editingTodoId === vm.todo.id && (
+                <EditTodoInput
+                  initLabel={vm.todo.label}
+                  onSubmit={(label) => {
+                    vm.todo.label = label;
+                  }}
+                  onFinish={() => {
+                    props.editingTodoId.value = null;
+                  }}
+                />
+              )
+          )}
+        </Fragment>
       </Li>
     );
   });
 };
 
-const App = (props) => {
+const FilterRow = ({ filterKey }) => {
   return useConstant(() => {
     const vm = setup({
-      props: {
-        routeName: props.routeName,
+      refs: {
+        routeName: Router.routeName$,
       },
-      data: {
-        todoList: [],
-        editingTodoId: undefined,
+      computed: {
+        className() {
+          return vm.routeName === filterKey ? "selected" : "";
+        },
+      },
+    });
+
+    return (
+      <li>
+        <A href={Router.getPath(filterKey)} className={vm.className}>
+          {filterKeyLabelMap[filterKey]}
+        </A>
+      </li>
+    );
+  });
+};
+
+const App = () => {
+  return useConstant(() => {
+    const data = reactive({
+      todoList: [],
+    });
+
+    const editingTodoId = ref(undefined);
+
+    const vm = setup({
+      refs: {
+        routeName: Router.routeName$,
       },
       computed: {
         filteredTodoList() {
-          if (this.routeName === "ALL") {
-            return this.todoList;
+          if (vm.routeName === "ALL") {
+            return data.todoList;
           }
 
-          const filterValue = this.routeName === "COMPLETED";
-          return this.todoList.filter(({ done }) => done === filterValue);
+          const filterValue = vm.routeName === "COMPLETED";
+          return data.todoList.filter(({ done }) => done === filterValue);
         },
         itemsLeft() {
-          return this.todoList.reduce(
+          return data.todoList.reduce(
             (sum, todo) => (sum += todo.done ? 0 : 1),
             0
           );
         },
         isAllCompleted() {
           return (
-            this.todoList.length > 0 && this.todoList.every((todo) => todo.done)
+            data.todoList.length > 0 && data.todoList.every((todo) => todo.done)
           );
         },
       },
       methods: {
         onToggleAll() {
-          const done = !this.isAllCompleted;
-          this.todoList.forEach((todo) => {
+          const done = !vm.isAllCompleted;
+          data.todoList.forEach((todo) => {
             todo.done = done;
           });
         },
         onClearCompletedClick() {
-          this.todoList = this.todoList.filter(({ done }) => !done);
-        },
-        filterClassName(filterKey) {
-          return computed(() =>
-            this.routeName === filterKey ? "selected" : ""
-          );
+          data.todoList = data.todoList.filter(({ done }) => !done);
         },
       },
     });
-
-    const editingTodoId = toRef(vm, "editingTodoId");
 
     return (
       <>
@@ -205,7 +229,7 @@ const App = (props) => {
             <h1>todos</h1>
             <NewTodoInput
               onSubmit={(label) =>
-                vm.todoList.unshift({
+                data.todoList.unshift({
                   id: new Date().getTime(),
                   label,
                   done: false,
@@ -228,8 +252,8 @@ const App = (props) => {
                   todo={todo}
                   editingTodoId={editingTodoId}
                   onDestroyClick={() => {
-                    vm.todoList.splice(
-                      vm.todoList.findIndex(({ id }) => id === todo.id),
+                    data.todoList.splice(
+                      data.todoList.findIndex(({ id }) => id === todo.id),
                       1
                     );
                   }}
@@ -242,16 +266,13 @@ const App = (props) => {
               <Strong>{vm.itemsLeft}</Strong> items left
             </span>
             <ul className="filters">
-              {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
-                <li key={filterKey}>
-                  <A
-                    href={Router.getPath(filterKey)}
-                    className={vm.filterClassName(filterKey)}
-                  >
-                    {filterKeyLabelMap[filterKey]}
-                  </A>
-                </li>
-              ))}
+              {renderList(
+                ["ALL", "ACTIVE", "COMPLETED"],
+                (filterKey) => filterKey,
+                (filterKey) => (
+                  <FilterRow filterKey={filterKey} />
+                )
+              )}
             </ul>
             <button
               className="clear-completed"
@@ -273,10 +294,6 @@ const App = (props) => {
       </>
     );
   });
-};
-
-App.defaultProps = {
-  routeName: Router.routeName$,
 };
 
 export default App;

@@ -6,7 +6,7 @@ import {
   watchEffect,
   watchSyncEffect,
   isRef,
-  computed,
+  computed as _computed,
 } from "@vue/runtime-core";
 
 const dumbEffect = (callback) => callback();
@@ -171,75 +171,84 @@ const mapValues = (data, mapper) =>
     return result;
   }, {});
 
-const setup = ({ props, data = {}, computed: computedConfig, methods }) => {
-  props = { ...props };
-  const innerObject = new Proxy(
-    {},
-    {
-      get(target, key) {
-        for (const obj of [props, data$, computed$]) {
-          if (obj && obj.hasOwnProperty(key)) {
-            return unref(obj[key]);
-          }
-        }
-
-        if (methods$.hasOwnProperty(key)) {
-          return methods$[key];
-        }
-      },
-      set(target, key, value) {
-        data$[key] = value;
-        return true;
-      },
-    }
-  );
-
-  if (typeof data === "function") {
-    pauseTracking();
-    data = data.call(innerObject);
-    resetTracking();
+let autoUnRef = false;
+const computed = (fn) => {
+  const fnIsFunction = typeof fn === "function";
+  const finalFn = fnIsFunction ? fn : fn.get;
+  const config = {
+    get() {
+      autoUnRef = true;
+      try {
+        const result = finalFn();
+        autoUnRef = false;
+        return result;
+      } catch (e) {
+        autoUnRef = false;
+        throw e;
+      }
+    },
+  };
+  if (!fnIsFunction) {
+    config.set = fn.set;
   }
+  return _computed(config);
+};
 
-  const data$ = data && reactive(data);
-  const computed$ =
-    computedConfig &&
-    mapValues(computedConfig, (fn) => {
-      return computed(fn.bind(innerObject));
-    });
-  const methods$ =
-    methods &&
-    mapValues(methods, (fn) => {
-      return function () {
-        pauseTracking();
-        try {
-          const result = fn.apply(innerObject, arguments);
-          resetTracking();
-          return result;
-        } catch (e) {
-          resetTracking();
-          throw e;
-        }
-      };
-    });
+const method = (fn) => {
+  return function (...args) {
+    pauseTracking();
+    autoUnRef = true;
+    try {
+      const result = fn(...args);
+      resetTracking();
+      autoUnRef = false;
+      return result;
+    } catch (e) {
+      resetTracking();
+      autoUnRef = false;
+      throw e;
+    }
+  };
+};
+const setup = ({ computed: computedConfig, methods, refs }) => {
+  const keys = [
+    ...(computedConfig ? Object.keys(computedConfig) : []),
+    ...(methods ? Object.keys(methods) : []),
+    ...(refs ? Object.keys(refs) : []),
+  ];
 
-  const seq = [props, data$, computed$, methods$].filter(Boolean);
+  keys.forEach((key) => {
+    if (keys.indexOf(key) !== keys.lastIndexOf(key)) {
+      throw new Error(`Key \`${key}\` is duplicated.`);
+    }
+  });
 
-  return new Proxy(
+  refs = refs && { ...refs };
+  const computed$ = computedConfig && mapValues(computedConfig, computed);
+
+  const methods$ = methods && mapValues(methods, method);
+
+  const seq = [computed$, methods$, refs].filter(Boolean);
+
+  const vm = new Proxy(
     {},
     {
       get(target, key) {
         for (const obj of seq) {
           if (obj.hasOwnProperty(key)) {
-            return obj[key];
+            const value = obj[key];
+            if (autoUnRef) {
+              return unref(value);
+            }
+            return value;
           }
         }
-      },
-      set(target, key, value) {
-        data$[key] = value;
-        return true;
+        console.warn(`Key \`${key}\` not found.`);
       },
     }
   );
+
+  return vm;
 };
 
 export {
@@ -249,4 +258,6 @@ export {
   useConstant,
   renderList,
   setup,
+  computed,
+  method,
 };
