@@ -222,11 +222,11 @@ const setup = ({ computed: computedConfig, methods, refs }) => {
     }
   });
 
+  // spread to deal with react props
   refs = refs && { ...refs };
+
   const computed$ = computedConfig && mapValues(computedConfig, computed);
-
   const methods$ = methods && mapValues(methods, method);
-
   const seq = [computed$, methods$, refs].filter(Boolean);
 
   const vm = new Proxy(
@@ -244,6 +244,16 @@ const setup = ({ computed: computedConfig, methods, refs }) => {
         }
         console.warn(`Key \`${key}\` not found.`);
       },
+      set(target, key, value) {
+        for (const obj of seq) {
+          if (obj.hasOwnProperty(key)) {
+            obj[key].value = value;
+            return true;
+          }
+        }
+        console.warn(`Key \`${key}\` not found.`);
+        return true;
+      }
     }
   );
 
