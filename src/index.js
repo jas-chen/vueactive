@@ -12,7 +12,7 @@ const reactify = (tagName, options) => {
   const sync = options?.sync || false;
   const withRef = options?.withRef;
 
-  function Component(props) {
+  const Component = (props) => {
     const { $$options, forwardedRef, ...restProps } = props;
     const [, setState] = React.useState(0);
     const reactiveProps = Object.keys(restProps)
@@ -38,9 +38,9 @@ const reactify = (tagName, options) => {
     resetTracking();
 
     return React.createElement(tagName, childProps);
-  }
+  };
 
-  function PropsGuard(props) {
+  const PropsGuard = (props) => {
     const key = Object.entries(props)
       .map(([key, value]) => {
         if (isRef(value)) {
@@ -52,7 +52,7 @@ const reactify = (tagName, options) => {
       .join("~");
 
     return React.createElement(Component, { ...props, key });
-  }
+  };
 
   if (tagName === React.Fragment) {
     Component.displayName = `Reactive.Fragment`;
@@ -105,7 +105,7 @@ const List = ({ data, getKey, render }) => {
     const newCache = {};
 
     let lastList;
-    const list$ = computed(() => {
+    const list$ = _computed(() => {
       const newList = unref(data).map((item) => {
         const cacheKey = keyIsFunction ? getKey(item) : item[getKey];
         const cachedElement = cache[cacheKey];
@@ -280,6 +280,38 @@ const useData = (data, props) => {
   })[0];
 };
 
+const withReactiveProps = (Component) => {
+  const Container = (props) => {
+    const reactiveProps = Object.keys(props)
+      .sort()
+      .map((key) => props[key]);
+
+    return React.useMemo(() => {
+      const props$ = setup({
+        refs: props,
+      });
+
+      return React.createElement(Component, { props: props$ });
+    }, reactiveProps);
+  };
+
+  const PropsGuard = (props) => {
+    const key = Object.entries(props)
+      .map(([key, value]) => {
+        if (isRef(value)) {
+          return `${key}$`;
+        }
+
+        return key;
+      })
+      .join("~");
+
+    return React.createElement(Container, { ...props, key });
+  };
+
+  return PropsGuard;
+};
+
 export {
   reactify,
   component,
@@ -289,4 +321,5 @@ export {
   method,
   useData,
   createData,
+  withReactiveProps,
 };

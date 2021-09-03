@@ -1,44 +1,15 @@
 import React, { useMemo } from "react";
 import { toRef, ref } from "@vue/runtime-core";
-import { component, renderList, setup, computed, useData } from "vueactive";
+import {
+  component,
+  renderList,
+  setup,
+  computed,
+  useData,
+  withReactiveProps,
+} from "vueactive";
 
 const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
-
-document.head.insertAdjacentHTML(
-  "beforeend",
-  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
-);
-
-const createRouter = (routerConfig, defaultUrl = "#/") => {
-  const paths = Object.keys(routerConfig);
-  const isPathValid = () => paths.includes(window.location.hash);
-
-  if (!isPathValid()) {
-    window.location.hash = defaultUrl;
-  }
-
-  const routeName$ = ref(routerConfig[window.location.hash]);
-
-  window.addEventListener("hashchange", () => {
-    if (!isPathValid()) {
-      window.location.hash = defaultUrl;
-    } else {
-      routeName$.value = routerConfig[window.location.hash];
-    }
-  });
-
-  return {
-    routeName$,
-    getPath: (routeName) =>
-      paths.find((hash) => routerConfig[hash] === routeName),
-  };
-};
-
-const Router = createRouter({
-  "#/": "ALL",
-  "#/active": "ACTIVE",
-  "#/completed": "COMPLETED",
-});
 
 const NewTodoInput = ({ onSubmit }) => {
   return (
@@ -80,30 +51,25 @@ const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
   );
 };
 
-const TodoItem = (props) => {
+const TodoItem = withReactiveProps(({ props }) => {
   const vm = useMemo(() => {
     return setup({
-      refs: {
-        todo: props.todo,
-        editingTodoId: props.editingTodoId,
-        onDestroyClick: props.onDestroyClick,
-      },
       computed: {
         listClassName() {
           return [
-            vm.todo.done ? "completed" : "",
-            vm.editingTodoId === vm.todo.id ? "editing" : "",
+            props.todo.done ? "completed" : "",
+            props.editingTodoId === props.todo.id ? "editing" : "",
           ].join(" ");
         },
         label() {
-          return vm.todo.label;
+          return props.todo.label;
         },
         checked() {
-          return vm.todo.done;
+          return props.todo.done;
         },
       },
     });
-  }, [props.todo, props.editingTodoId, props.onDestroyClick]);
+  }, [props.todo, props.editingTodoId]);
 
   return useMemo(() => {
     return (
@@ -114,29 +80,29 @@ const TodoItem = (props) => {
             className="toggle"
             checked={vm.checked}
             onChange={() => {
-              vm.todo.done = !vm.todo.done;
+              props.todo.done = !props.todo.done;
             }}
           />
           <Label
             onDoubleClick={() => {
-              vm.editingTodoId = vm.todo.id;
+              props.editingTodoId = props.todo.id;
             }}
           >
             {vm.label}
           </Label>
-          <button className="destroy" onClick={vm.onDestroyClick} />
+          <button className="destroy" onClick={props.onDestroyClick} />
         </div>
         <Fragment>
           {computed(
             () =>
-              vm.editingTodoId === vm.todo.id && (
+              props.editingTodoId === props.todo.id && (
                 <EditTodoInput
-                  initLabel={vm.todo.label}
+                  initLabel={props.todo.label}
                   onSubmit={(label) => {
-                    vm.todo.label = label;
+                    props.todo.label = label;
                   }}
                   onFinish={() => {
-                    vm.editingTodoId = null;
+                    props.editingTodoId = null;
                   }}
                 />
               )
@@ -145,7 +111,7 @@ const TodoItem = (props) => {
       </Li>
     );
   }, [vm]);
-};
+});
 
 const FILTER_KEY_LABEL_MAP = {
   ALL: "All",
@@ -153,31 +119,27 @@ const FILTER_KEY_LABEL_MAP = {
   COMPLETED: "Completed",
 };
 
-const FilterRow = (props) => {
+const FilterRow = withReactiveProps(({ props }) => {
   const vm = useMemo(() => {
     return setup({
-      refs: {
-        routeName: Router.routeName$,
-        filterKey: props.filterKey,
-      },
       computed: {
         className() {
-          return vm.routeName === vm.filterKey ? "selected" : "";
+          return props.routeName === props.filterKey ? "selected" : "";
         },
       },
     });
-  }, [props.filterKey]);
+  }, [props.filterKey, props.routeName]);
 
   return useMemo(() => {
     return (
       <li>
-        <A href={Router.getPath(vm.filterKey)} className={vm.className}>
-          {FILTER_KEY_LABEL_MAP[vm.filterKey]}
+        <A href={Router.getPath(props.filterKey)} className={vm.className}>
+          {FILTER_KEY_LABEL_MAP[props.filterKey]}
         </A>
       </li>
     );
   }, [vm]);
-};
+});
 
 const App = () => {
   const data = useData(() => ({
@@ -278,7 +240,7 @@ const App = () => {
                 ["ALL", "ACTIVE", "COMPLETED"],
                 (filterKey) => filterKey,
                 (filterKey) => (
-                  <FilterRow filterKey={filterKey} />
+                  <FilterRow filterKey={filterKey} routeName={vm.routeName} />
                 )
               )}
             </ul>
@@ -303,5 +265,45 @@ const App = () => {
     );
   }, [vm]);
 };
+
+// ==== Router ====
+
+document.head.insertAdjacentHTML(
+  "beforeend",
+  '<link href="https://unpkg.com/todomvc-app-css@2.3.0/index.css" rel="stylesheet">'
+);
+
+const createRouter = (routerConfig, defaultUrl = "#/") => {
+  const paths = Object.keys(routerConfig);
+  const isPathValid = () => paths.includes(window.location.hash);
+
+  if (!isPathValid()) {
+    window.location.hash = defaultUrl;
+  }
+
+  const routeName$ = ref(routerConfig[window.location.hash]);
+
+  window.addEventListener("hashchange", () => {
+    if (!isPathValid()) {
+      window.location.hash = defaultUrl;
+    } else {
+      routeName$.value = routerConfig[window.location.hash];
+    }
+  });
+
+  return {
+    routeName$,
+    getPath: (routeName) =>
+      paths.find((hash) => routerConfig[hash] === routeName),
+  };
+};
+
+const Router = createRouter({
+  "#/": "ALL",
+  "#/active": "ACTIVE",
+  "#/completed": "COMPLETED",
+});
+
+// ==== Router ====
 
 export default App;
