@@ -1,77 +1,57 @@
 import React from "react";
 import { pauseTracking, resetTracking } from "@vue/reactivity";
 import {
+  reactive,
   unref,
-  watchEffect,
-  watchSyncEffect,
+  watch,
   isRef,
   computed as _computed,
 } from "@vue/runtime-core";
 
-const dumbEffect = (callback) => callback();
-
-let _isStaticRendering = false;
-
-const setIsStaticRendering = (isStaticRendering) => {
-  _isStaticRendering = isStaticRendering;
-};
-
-const getEffect = (sync) => {
-  if (_isStaticRendering) return dumbEffect;
-
-  return sync ? watchSyncEffect : watchEffect;
-};
-
-const isBrowser = typeof window !== "undefined" && globalThis === window;
-
-setIsStaticRendering(!isBrowser);
-
 const reactify = (tagName, options) => {
-  const sync =
-    options?.sync ?? typeof tagName === "string"
-      ? ["input", "textarea"].includes(tagName)
-      : false;
-
+  const sync = options?.sync || false;
   const withRef = options?.withRef;
 
-  class Component extends React.Component {
-    constructor(props) {
-      super(props);
-      const { $$options, forwardedRef, ...restProps } = props;
+  function Component(props) {
+    const { $$options, forwardedRef, ...restProps } = props;
+    const [, setState] = React.useState(0);
+    const reactiveProps = Object.keys(restProps)
+      .sort()
+      .map((key) => restProps[key])
+      .filter((value) => isRef(value));
 
-      this.stopEffect = getEffect(sync)(() => {
-        const childProps = Object.entries(restProps).reduce(
-          (result, [key, value]) => {
-            if (isRef(value)) {
-              this.hasReactiveProp = true;
-              result[key] = unref(value);
-            } else {
-              result[key] = value;
-            }
+    React.useEffect(() => {
+      return watch(
+        reactiveProps,
+        () => {
+          setState((s) => s + 1);
+        },
+        { ...$$options, sync }
+      );
+    }, reactiveProps);
 
-            return result;
-          },
-          forwardedRef ? { ref: forwardedRef } : {}
-        );
+    pauseTracking();
+    const childProps = Object.assign(
+      forwardedRef ? { ref: forwardedRef } : {},
+      mapValues(restProps, unref)
+    );
+    resetTracking();
 
-        const element = React.createElement(tagName, childProps);
+    return React.createElement(tagName, childProps);
+  }
 
-        if (!this.state) {
-          this.state = { element };
-        } else {
-          this.setState(() => ({ element }));
+  function PropsGuard(props) {
+    const key = Object.entries(props)
+      .map(([key, value]) => {
+        if (isRef(value)) {
+          return `${key}$`;
         }
-      }, $$options);
-    }
-    render() {
-      return this.state.element;
-    }
-    componentWillUnmount() {
-      this.stopEffect();
-    }
-    shouldComponentUpdate(nextProps, nextState) {
-      return !this.hasReactiveProp || nextState.element !== this.state.element;
-    }
+
+        return key;
+      })
+      .join("~");
+
+    return React.createElement(Component, { ...props, key });
   }
 
   if (tagName === React.Fragment) {
@@ -86,14 +66,14 @@ const reactify = (tagName, options) => {
 
   if (withRef) {
     return React.forwardRef(function ReactiveWithRef(props, ref) {
-      return React.createElement(Component, {
+      return React.createElement(PropsGuard, {
         ...props,
         forwardedRef: ref,
       });
     });
   }
 
-  return React.memo(Component);
+  return PropsGuard;
 };
 
 const WITH_REF = "WithRef";
@@ -118,19 +98,19 @@ const component = new Proxy(new Map(), {
   },
 });
 
-const useConstant = (state) => React.useState(state)[0];
-
 const List = ({ data, getKey, render }) => {
-  return useConstant(() => {
+  return React.useMemo(() => {
     const cache = {};
     const keyIsFunction = typeof getKey === "function";
     const newCache = {};
 
+    let lastList;
     const list$ = computed(() => {
-      const result = unref(data).map((item) => {
+      const newList = unref(data).map((item) => {
         const cacheKey = keyIsFunction ? getKey(item) : item[getKey];
+        const cachedElement = cache[cacheKey];
         const element =
-          cache[cacheKey] ||
+          cachedElement ||
           React.createElement(React.Fragment, {
             key: cacheKey,
             children: render(item),
@@ -142,19 +122,29 @@ const List = ({ data, getKey, render }) => {
         return element;
       });
 
+      if (
+        lastList &&
+        lastList.length === newList.length &&
+        lastList.every((element, i) => element === newList[i])
+      ) {
+        return lastList;
+      }
+
+      lastList = newList;
+
       Object.keys(cache).forEach((cacheKey) => {
         if (!newCache.hasOwnProperty(cacheKey)) {
           delete cache[cacheKey];
         }
       });
 
-      return result;
+      return newList;
     });
 
     return React.createElement(component.Fragment, {
       children: list$,
     });
-  });
+  }, [data, getKey, render]);
 };
 
 const renderList = (data, key, render) =>
@@ -209,6 +199,7 @@ const method = (fn) => {
     }
   };
 };
+
 const setup = ({ computed: computedConfig, methods, refs }) => {
   const keys = [
     ...(computedConfig ? Object.keys(computedConfig) : []),
@@ -253,20 +244,49 @@ const setup = ({ computed: computedConfig, methods, refs }) => {
         }
         console.warn(`Key \`${key}\` not found.`);
         return true;
-      }
+      },
     }
   );
 
   return vm;
 };
 
+const createData = (data, props) => {
+  const props$ = props && setup({ refs: props });
+  pauseTracking();
+  autoUnRef = true;
+  let result;
+
+  try {
+    if (typeof data === "function") {
+      result = data(props$);
+    } else {
+      result = data;
+    }
+  } catch (e) {
+    autoUnRef = false;
+    resetTracking();
+    throw e;
+  }
+
+  autoUnRef = false;
+  resetTracking();
+  return reactive(result);
+};
+
+const useData = (data, props) => {
+  return React.useState(() => {
+    return createData(data, props);
+  })[0];
+};
+
 export {
-  setIsStaticRendering,
   reactify,
   component,
-  useConstant,
   renderList,
   setup,
   computed,
   method,
+  useData,
+  createData,
 };
