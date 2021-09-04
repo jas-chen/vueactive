@@ -295,11 +295,19 @@ const useWatch = (fn, option, deps = []) => {
 
 const createComponent = ({ displayName, setup: setupFn }) => {
   const Component = withReactiveProps((props) => {
-    return useReactiveProps(props, (props) => {
+    const mountedRef = React.useRef();
+    const element = useReactiveProps(props, (props) => {
       const config = typeof setupFn === "function" ? setupFn(props) : setupFn;
       const vm = setup(config);
+      mountedRef.current = () => config.mounted?.call(vm);
       return config.render.call(vm);
     });
+
+    React.useEffect(() => {
+      return mountedRef.current?.();
+    }, []);
+
+    return element;
   }, displayName);
 
   return Component;
