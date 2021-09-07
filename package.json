@@ -1,6 +1,6 @@
 {
   "name": "vueactive",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "React bindings for @vue/reactivity.",
   "author": "Jas Chen",
   "license": "MIT",
