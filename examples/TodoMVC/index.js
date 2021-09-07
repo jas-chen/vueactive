@@ -1,113 +1,143 @@
 import React, { memo } from "react";
-import { ref, unref as $, computed } from "@vue/runtime-core";
-import { component, useData } from "vueactive";
+import { ref } from "@vue/runtime-core";
+import { component, useSetup, renderList, render } from "vueactive";
 
-const { Input, Ul, Label, A, Li, Fragment, Strong } = component;
+const { Input, InputWithRef, Ul, Label, A, Li, Fragment, Strong } = component;
 
-const NewTodoInput = ({ onSubmit }) => {
+const NewTodoInput = memo(function NewTodoInput(props) {
+  const vm = useSetup({
+    refs: props,
+    data: {
+      text: "",
+    },
+    methods: {
+      setText(text) {
+        this.text = text;
+      },
+      handleKeyPress(e) {
+        if (e.key === "Enter" && this.text) {
+          this.onSubmit(this.text.trim());
+          this.setText("");
+        }
+      },
+    },
+  });
+
   return (
-    <input
-      ref={(element) => element?.focus()}
+    <InputWithRef
+      ref={(input) => input?.focus()}
       className="new-todo"
       placeholder="What needs to be done?"
-      onKeyPress={(e) => {
-        if (e.key === "Enter" && e.target.value) {
-          onSubmit(e.target.value.trim());
-          e.target.value = "";
-        }
+      value={vm.text}
+      onChange={(e) => {
+        vm.setText(e.target.value);
       }}
+      onKeyPress={vm.handleKeyPress}
     />
   );
-};
+});
 
-const EditTodoInput = ({ initLabel, onSubmit, onFinish }) => {
+const EditTodoInput = memo(function EditTodoInput(props) {
+  const vm = useSetup(
+    {
+      refs: props,
+      data() {
+        return {
+          text: this.initLabel,
+        };
+      },
+      methods: {
+        handleKeyDown(e) {
+          if (e.key === "Enter") {
+            this.onSubmit(this.text);
+            this.onFinish();
+          } else if (e.key === "Escape") {
+            this.onFinish();
+          }
+        },
+      },
+    },
+    { readonly: false }
+  );
+
   return (
-    <input
+    <InputWithRef
       className="edit"
       ref={(input) => {
         if (input) {
           input.focus();
         }
       }}
-      defaultValue={initLabel}
-      onBlur={onFinish}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          onSubmit(e.target.value);
-          onFinish();
-        } else if (e.key === "Escape") {
-          vm.label = "";
-          onFinish();
-        }
+      value={vm.text}
+      onChange={(e) => {
+        vm.text = e.target.value;
       }}
+      onBlur={vm.onFinish}
+      onKeyDown={vm.handleKeyDown}
     />
   );
-};
+});
 
-const TodoItem = memo(function TodoItem({
-  editingId,
-  todo,
-  onToggleClick,
-  onDestroyClick,
-  onEdit,
-  onSubmit,
-}) {
-  const isEditing = computed(() => {
-    return $(editingId) === $(todo).id;
-  });
-
-  const listClassName = computed(() => {
-    return [
-      $(todo).done ? "completed" : "",
-      $(isEditing) ? "editing" : "",
-    ].join(" ");
-  });
-
-  const label = computed(() => {
-    return $(todo).label;
-  });
-
-  const checked = computed(() => {
-    return $(todo).done;
+const TodoItem = memo(function TodoItem(props) {
+  const vm = useSetup({
+    refs: props,
+    computed: {
+      isEditing() {
+        return this.editingId === this.todo.id;
+      },
+      listClassName() {
+        return [
+          this.todo.done ? "completed" : "",
+          this.isEditing ? "editing" : "",
+        ].join(" ");
+      },
+      label() {
+        return this.todo.label;
+      },
+      checked() {
+        return this.todo.done;
+      },
+    },
+    methods: {
+      handleToggleChange() {
+        this.onToggleClick(this.todo);
+      },
+      handleDoubleClick() {
+        this.onEdit(this.todo.id);
+      },
+      handleDestroyClick() {
+        this.onDestroyClick(this.todo);
+      },
+      handleSubmit(label) {
+        this.onSubmit(this.todo, label);
+      },
+      handleFinish() {
+        this.onEdit(null);
+      },
+    },
   });
 
   return (
-    <Li className={listClassName}>
+    <Li className={vm.listClassName}>
       <div className="view">
         <Input
           type="checkbox"
           className="toggle"
-          checked={checked}
-          onChange={() => {
-            onToggleClick($(todo));
-          }}
+          checked={vm.checked}
+          onChange={vm.handleToggleChange}
         />
-        <Label
-          onDoubleClick={() => {
-            onEdit($(todo).id);
-          }}
-        >
-          {label}
-        </Label>
-        <button
-          className="destroy"
-          onClick={() => {
-            onDestroyClick($(todo));
-          }}
-        />
+        <Label onDoubleClick={vm.handleDoubleClick}>{vm.label}</Label>
+        <button className="destroy" onClick={vm.handleDestroyClick} />
       </div>
       <Fragment>
-        {computed(
-          () =>
-            $(isEditing) && (
+        {render(
+          vm.isEditing,
+          (isEditing) =>
+            isEditing && (
               <EditTodoInput
-                initLabel={$(todo).label}
-                onSubmit={(label) => {
-                  onSubmit(todo, label);
-                }}
-                onFinish={() => {
-                  onEdit(null);
-                }}
+                initLabel={vm.todo.label}
+                onSubmit={vm.handleSubmit}
+                onFinish={vm.handleFinish}
               />
             )
         )}
@@ -122,137 +152,143 @@ const FILTER_KEY_LABEL_MAP = {
   COMPLETED: "Completed",
 };
 
-const FilterRow = memo(({ routeName, filterKey }) => {
-  const className = computed(() => {
-    return $(routeName) === $(filterKey) ? "selected" : "";
+const FilterRow = memo((props) => {
+  const vm = useSetup({
+    refs: props,
+    computed: {
+      className() {
+        return this.routeName === this.filterKey ? "selected" : "";
+      },
+      path() {
+        return Router.getPath(this.filterKey);
+      },
+      label() {
+        return FILTER_KEY_LABEL_MAP[this.filterKey];
+      },
+    },
   });
 
   return (
     <li>
-      <A href={Router.getPath($(filterKey))} className={className}>
-        {FILTER_KEY_LABEL_MAP[$(filterKey)]}
+      <A href={vm.path} className={vm.className}>
+        {vm.label}
       </A>
     </li>
   );
 });
 
 const App = () => {
-  const [todoList, setTodoList] = useData([]);
-  const [editingTodoId, setEditingTodoId] = useData(null);
+  const vm = useSetup({
+    refs: {
+      routeName: Router.routeName,
+    },
+    data: {
+      todoList: [],
+      editingTodoId: null,
+    },
+    computed: {
+      filteredTodoList() {
+        if (this.routeName === "ALL") {
+          return this.todoList;
+        }
 
-  const filteredTodoList = computed(() => {
-    if ($(Router.routeName) === "ALL") {
-      return $(todoList);
-    }
-
-    const filterValue = $(Router.routeName) === "COMPLETED";
-    return $(todoList).filter(({ done }) => done === filterValue);
+        const filterValue = this.routeName === "COMPLETED";
+        return this.todoList.filter(({ done }) => done === filterValue);
+      },
+      itemsLeft() {
+        return this.todoList.reduce(
+          (sum, todo) => (sum += todo.done ? 0 : 1),
+          0
+        );
+      },
+      isAllCompleted() {
+        return (
+          this.todoList.length > 0 && this.todoList.every((todo) => todo.done)
+        );
+      },
+    },
+    methods: {
+      addTodo(label) {
+        this.todoList.unshift({
+          id: new Date().getTime(),
+          label,
+          done: false,
+        });
+      },
+      setEditingTodoId(id) {
+        this.editingTodoId = id;
+      },
+      deleteTodo(todo) {
+        this.todoList.splice(
+          this.todoList.findIndex(({ id }) => id === todo.id),
+          1
+        );
+      },
+      toggleTodo(todo) {
+        const i = this.todoList.findIndex(({ id }) => todo.id === id);
+        this.todoList[i].done = !todo.done;
+      },
+      setTodoLabel(todo, label) {
+        this.todoList.find(({ id }) => todo.id === id).label = label;
+      },
+      toggleAll() {
+        const done = !this.isAllCompleted;
+        this.todoList.forEach((todo) => {
+          todo.done = done;
+        });
+      },
+      clearCompletedClick() {
+        this.todoList = this.todoList.filter(({ done }) => !done);
+      },
+    },
   });
-
-  const itemsLeft = computed(() => {
-    return $(todoList).reduce((sum, todo) => (sum += todo.done ? 0 : 1), 0);
-  });
-
-  const isAllCompleted = computed(() => {
-    return $(todoList).length > 0 && $(todoList).every((todo) => todo.done);
-  });
-
-  function addTodo(label) {
-    setTodoList((todoList) => {
-      $(todoList).unshift({
-        id: new Date().getTime(),
-        label,
-        done: false,
-      });
-    });
-  }
-
-  function deleteTodo(todo) {
-    setTodoList((todoList) => {
-      $(todoList).splice(
-        $(todoList).findIndex(({ id }) => id === todo.id),
-        1
-      );
-    });
-  }
-
-  function toggleTodo(todo) {
-    const i = $(todoList).findIndex((t) => todo === t);
-    setTodoList((todoList) => {
-      $(todoList)[i].done = !todo.done;
-    });
-  }
-
-  function setTodoLabel(todo, label) {
-    const i = $(todoList).findIndex((t) => todo === t);
-    setTodoList((todoList) => {
-      $(todoList)[i].label = label;
-    });
-  }
-
-  function toggleAll() {
-    const done = !$(isAllCompleted);
-    setTodoList((todoList) => {
-      $(todoList).forEach((todo) => {
-        todo.done = done;
-      });
-    });
-  }
-
-  function clearCompletedClick() {
-    setTodoList((todoList) => {
-      todoList.value = $(todoList).filter(({ done }) => !done);
-    });
-  }
 
   return (
     <>
       <div className="todoapp">
         <header className="header">
           <h1>todos</h1>
-          <NewTodoInput onSubmit={addTodo} />
+          <NewTodoInput onSubmit={vm.addTodo} />
         </header>
         <section className="main">
           <Input
             id="toggle-all"
             type="checkbox"
             className="toggle-all"
-            checked={isAllCompleted}
-            onChange={toggleAll}
+            checked={vm.isAllCompleted}
+            onChange={vm.toggleAll}
           />
           <label htmlFor="toggle-all" />
           <Ul className="todo-list">
-            {computed(() =>
-              $(filteredTodoList).map((todo) => (
+            {renderList(vm.filteredTodoList, (todo) => {
+              return (
                 <TodoItem
                   key={todo.id}
                   todo={todo}
-                  editingId={editingTodoId}
-                  onToggleClick={toggleTodo}
-                  onDestroyClick={deleteTodo}
-                  onEdit={setEditingTodoId}
-                  onSubmit={setTodoLabel}
+                  editingId={vm.editingTodoId}
+                  onToggleClick={vm.toggleTodo}
+                  onDestroyClick={vm.deleteTodo}
+                  onEdit={vm.setEditingTodoId}
+                  onSubmit={vm.setTodoLabel}
                 />
-              ))
-            )}
+              );
+            })}
           </Ul>
         </section>
         <footer className="footer">
           <span className="todo-count">
-            <Strong>{itemsLeft}</Strong> items left
+            <Strong>{vm.itemsLeft}</Strong> items left
           </span>
-          <Ul className="filters">
-            {computed(() =>
-              ["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
-                <FilterRow
-                  key={filterKey}
-                  filterKey={filterKey}
-                  routeName={Router.routeName}
-                />
-              ))
-            )}
-          </Ul>
-          <button className="clear-completed" onClick={clearCompletedClick}>
+          <ul className="filters">
+            {["ALL", "ACTIVE", "COMPLETED"].map((filterKey) => (
+              <FilterRow
+                key={filterKey}
+                filterKey={filterKey}
+                routeName={vm.routeName}
+              />
+            ))}
+          </ul>
+          <button className="clear-completed" onClick={vm.clearCompletedClick}>
             Clear completed
           </button>
         </footer>

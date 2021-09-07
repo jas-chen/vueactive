@@ -1,9 +1,10 @@
 import React from "react";
 import {
-  toRef,
+  toRefs,
   reactive,
   readonly,
   unref,
+  computed as _computed,
   watch,
   isRef,
 } from "@vue/runtime-core";
@@ -18,16 +19,23 @@ const getComponentName = (Component) => {
     : Component.displayName || Component.name || "Anonymous";
 };
 
+const INPUT_TAGS = ["input", "textarea"];
 const reactify = (tagName, options) => {
-  const sync = options?.sync || false;
+  const flush = options?.flush;
   const withRef = options?.withRef;
+  const isInputTag = INPUT_TAGS.includes(tagName);
 
   const Component = (props) => {
     const { $$options, forwardedRef, ...restProps } = props;
     const [, setState] = React.useState(0);
+    const isControlledInput =
+      isInputTag && restProps.onChange && isRef(restProps.value);
     const reactiveProps = Object.keys(restProps)
+      .filter((key) => !(isControlledInput && key === "value"))
       .sort()
-      .map((key) => restProps[key])
+      .map((key) => {
+        return restProps[key];
+      })
       .filter((value) => isRef(value));
 
     React.useEffect(() => {
@@ -36,9 +44,21 @@ const reactify = (tagName, options) => {
         () => {
           setState((s) => s + 1);
         },
-        { ...$$options, sync }
+        { flush, ...$$options }
       );
     }, reactiveProps);
+
+    React.useEffect(() => {
+      if (isControlledInput && !flush) {
+        return watch(
+          [restProps.value],
+          () => {
+            setState((s) => s + 1);
+          },
+          { flush: "sync", ...$$options }
+        );
+      }
+    }, [isControlledInput]);
 
     const childProps = Object.assign(
       forwardedRef ? { ref: forwardedRef } : {},
@@ -105,25 +125,138 @@ const mapValues = (data, mapper) =>
     return result;
   }, {});
 
-const useData = (data) => {
-  return React.useState(() => {
-    if (typeof data === "function") {
-      data = data();
-    }
+let autoUnRef = false;
 
-    data = toRef(reactive({ value: data }), "value");
+function computed(fn) {
+  const fnIsFunction = typeof fn === "function";
+  const finalFn = fnIsFunction ? fn : fn.get;
+  const context = this;
+  const config = {
+    get() {
+      return runWithUnref.call(context, finalFn);
+    },
+  };
+  if (!fnIsFunction) {
+    config.set = fn.set;
+  }
+  return _computed(config);
+}
 
-    return [
-      readonly(data),
-      function setData(value) {
-        if (typeof value === "function") {
-          value(data);
-        } else {
-          data.value = value;
+function method(fn) {
+  return (...args) => {
+    return runWithUnref.call(this, function () {
+      fn.apply(this, args);
+    });
+  };
+}
+
+const useSetup = (
+  { computed: computedConfig, methods, refs, data },
+  options
+) => {
+  [computedConfig, methods, refs, data]
+    .map((obj) => (obj ? Object.keys(obj) : []))
+    .flat()
+    .forEach((key, _, keys) => {
+      if (keys.indexOf(key) !== keys.lastIndexOf(key)) {
+        throw new Error(`Key \`${key}\` is duplicated.`);
+      }
+    });
+
+  const readonlyMode = options?.readonly ?? true;
+
+  // spread to deal with react props
+  refs = refs && { ...refs };
+
+  const seq = refs ? [refs] : [];
+
+  let state;
+  const vm = new Proxy(
+    {},
+    {
+      get(target, key) {
+        for (const obj of seq) {
+          if (obj.hasOwnProperty(key)) {
+            if (autoUnRef) {
+              return unref(
+                (state && obj === state.readonlyData ? state.mutableData : obj)[
+                  key
+                ]
+              );
+            }
+            return obj[key];
+          }
         }
+        console.warn(`Key \`${key}\` not found.`);
       },
-    ];
+      set(target, key, value) {
+        for (const obj of seq) {
+          if (obj.hasOwnProperty(key)) {
+            (autoUnRef && state && obj === state.readonlyData
+              ? state.mutableData
+              : obj)[key].value = value;
+            return true;
+          }
+        }
+        console.warn(`Key \`${key}\` not found.`);
+        return true;
+      },
+    }
+  );
+
+  state = React.useState(() => {
+    if (data) {
+      const mutableData = toRefs(reactive(runWithUnref.call(vm, data)));
+      return {
+        readonlyData: readonlyMode
+          ? mapValues(mutableData, readonly)
+          : mutableData,
+        mutableData,
+      };
+    }
   })[0];
+
+  const computed$ =
+    computedConfig && mapValues(computedConfig, (fn) => computed.call(vm, fn));
+
+  const methods$ = methods && mapValues(methods, (fn) => method.call(vm, fn));
+
+  seq.push(...[state?.readonlyData, computed$, methods$].filter(Boolean));
+
+  return vm;
 };
 
-export { reactify, component, useData };
+function runWithUnref(fn) {
+  if (typeof fn !== "function") {
+    return fn;
+  }
+
+  autoUnRef = true;
+  try {
+    const result = fn.call(this);
+    autoUnRef = false;
+    return result;
+  } catch (e) {
+    autoUnRef = false;
+    throw e;
+  }
+}
+
+const render = (value, fn) => {
+  return _computed(() => {
+    return fn(unref(value));
+  });
+};
+
+const renderList = (arrayLike, fn) => {
+  return _computed(() => {
+    try {
+      const result = Array.from(unref(arrayLike), fn);
+      return result;
+    } catch (e) {
+      throw e;
+    }
+  });
+};
+
+export { reactify, component, useSetup, render, renderList };
