@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  toRefs,
+  ref,
   reactive,
   readonly,
   unref,
@@ -206,7 +206,10 @@ const useSetup = (
 
   state = React.useState(() => {
     if (data) {
-      const mutableData = toRefs(reactive(runWithUnref.call(vm, data)));
+      const finalData = runWithUnref.call(vm, data);
+      const mutableData = mapValues(finalData, (value) =>
+        value && typeof value === "object" ? ref(reactive(value)) : ref(value)
+      );
       return {
         readonlyData: readonlyMode
           ? mapValues(mutableData, readonly)
