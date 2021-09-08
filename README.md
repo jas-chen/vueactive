@@ -16,22 +16,20 @@ Counter
 ```js
 import React, { useState } from "react";
 import { ref } from "@vue/reactivity";
-import { component, useConstant } from "vueactive";
+import { component } from "vueactive";
 
 const { Fragment } = component;
 
 const Counter = () => {
-  return useConstant(() => {
-    const count$ = ref(0);
+  const [count] = useState(() => ref(0));
 
-    return (
-      <>
-        <button onClick={() => count$.value--}>-</button>
-        <Fragment>{count$}</Fragment>
-        <button onClick={() => count$.value++}>+</button>
-      </>
-    );
-  });
+  return (
+    <>
+      <button onClick={() => count.value--}>-</button>
+      <Fragment>{count}</Fragment>
+      <button onClick={() => count.value++}>+</button>
+    </>
+  );
 };
 
 export default Counter;
